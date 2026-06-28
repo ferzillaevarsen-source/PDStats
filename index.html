@@ -752,9 +752,10 @@ const LEAGUES = [
 ];
 
 function leagueMatchName(tName, inputName) {
-  const clean = tName.toLowerCase().replace(/[«»"'«»]/g,'');
-  const input = inputName.toLowerCase().replace(/[«»"'«»]/g,'');
-  const sig = clean.split(/\s+/).filter(w=>w.length>4);
+  const norm=s=>s.toLowerCase().replace(/[«»“”‘’"']/g,'').replace(/\s+/g,' ').trim();
+  const clean=norm(tName);
+  const input=norm(inputName);
+  const sig=clean.split(' ').filter(w=>w.length>4);
   if(sig.length>=2) return sig.every(w=>input.includes(w));
   return input.includes(clean);
 }
@@ -1051,7 +1052,7 @@ function app() { return {
         // Date override
         const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
         // Re-entry number (Вхождение #N or Прохождение #N)
-        const em=t.match(/(?:Вхождение|Прохождение)\s*#(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
+        const em=t.match(/(?:Вхождение|Прохождение)[^0-9]*(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
         // Game type line
         if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL)/i.test(t))continue;
         // Buy-in: line starting with digit — strip non-numeric chars (robust against encoding)
@@ -1072,12 +1073,14 @@ function app() { return {
       const nc=a.name.localeCompare(b.name);if(nc)return nc;
       return a.entryNum-b.entryNum;
     });
+    // Normalize name for comparison: strip all quote variants, collapse spaces
+    const normN=s=>s.toLowerCase().replace(/[«»""''"']/g,'').replace(/\s+/g,' ').trim();
     // Merge re-entries: entryNum>1 attaches to the instance with maxEntryNum===entryNum-1
     // entryNum===1 always creates a new instance (separate plays on the same day stay separate)
     const instances=[];
     for(const r of raw){
       const target=r.entryNum>1
-        ?instances.find(m=>m.name===r.name&&m.date===r.date&&m.maxEntryNum===r.entryNum-1)
+        ?instances.find(m=>normN(m.name)===normN(r.name)&&m.date===r.date&&m.maxEntryNum===r.entryNum-1)
         :null;
       if(target){
         target.totalPaid+=r.paidTotal;
