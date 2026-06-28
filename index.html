@@ -419,7 +419,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
         </div>
         <div style="font-size:10px;color:#6b7280;margin-bottom:2px">Призовой фонд</div>
         <div style="font-size:15px;font-weight:800;margin-bottom:10px" :style="`color:${lg.color}`" x-text="fmt(lg.prize)"></div>
-        <div class="grid grid-cols-3 gap-1 mb-2">
+        <div class="grid grid-cols-3 gap-1">
           <div style="background:rgba(0,0,0,.3);border-radius:5px;padding:5px;text-align:center">
             <div style="font-size:9px;color:#6b7280">Тур.</div>
             <div style="font-size:13px;font-weight:700;color:#e2e8f0" x-text="leagueStats(lg.id).count"></div>
@@ -434,18 +434,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
             <div style="font-size:11px;font-weight:700" :class="leagueStats(lg.id).profit>=0?'pos':'neg'"
                  x-text="fmtK(leagueStats(lg.id).profit)"></div>
           </div>
-        </div>
-        <!-- Weekly progress -->
-        <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <span style="font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Эта неделя</span>
-            <span style="font-size:11px;font-weight:700" :style="`color:${lg.color}`"
-                  x-text="leagueWeekProgress(lg.id).played+' / '+leagueWeekProgress(lg.id).total"></span>
-          </div>
-          <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden">
-            <div :style="`width:${leagueWeekProgress(lg.id).total?Math.min(100,leagueWeekProgress(lg.id).played/leagueWeekProgress(lg.id).total*100):0}%;height:100%;background:${lg.color};border-radius:2px;transition:width .3s`"></div>
-          </div>
-          <div style="font-size:10px;color:#4b5563;margin-top:3px" x-text="leagueWeekProgress(lg.id).sessions+' игр | '+((leagueWeekProgress(lg.id).profit>=0?'+':'')+fmtK(leagueWeekProgress(lg.id).profit))"></div>
         </div>
       </div>
     </template>
