@@ -522,7 +522,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <li>Задайте период, выделите всё <kbd>Ctrl+A</kbd>, скопируйте <kbd>Ctrl+C</kbd></li>
       <li>Вставьте сюда <kbd>Ctrl+V</kbd></li>
     </ol>
-    <p style="font-size:12px;color:#374151;margin-top:8px">Вхождение #2, #3... — реентри объединяются автоматически. Лиговые турниры определяются по названию.</p>
+    <p style="font-size:12px;color:#374151;margin-top:8px">Каждое вхождение (#2, #3...) отображается отдельной строкой. Лиговые турниры определяются по названию.</p>
   </div>
   <div class="card p-4 mb-4">
     <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:5px">Дата (если не определяется автоматически)</label>
@@ -1026,74 +1026,55 @@ function app() { return {
     },80);
   },
   parsePokerDomList(text){
-    const raw=[];
+    const sessions=[];
     const lines=text.split('\n').map(l=>l.trimEnd());
     let globalDate=this.importDate||new Date().toISOString().slice(0,10);
+    // Extract date from file header
     for(let j=0;j<Math.min(8,lines.length);j++){const hd=lines[j].trim().match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/);if(hd){globalDate=`${hd[3]}-${hd[2]}-${hd[1]}`;break;}}
+    // Helper: extract first number from string
+    const numIn=s=>{const m=s&&s.match(/(\d[\d\s]*(?:[.,]\d+)?)/);return m?numRu(m[1]):0;};
     let i=0;
+    // Skip global header lines (date, game type headers, blanks)
     while(i<lines.length&&(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/.test(lines[i].trim())||/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())||lines[i].trim()===''))i++;
     while(i<lines.length){
       while(i<lines.length&&lines[i].trim()==='')i++;
       if(i>=lines.length)break;
       if(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())){i++;continue;}
+      // Collect block until tab-containing stats line or blank line
       const block=[];
       while(i<lines.length&&lines[i].trim()!==''&&!lines[i].includes('\t')){block.push(lines[i]);i++;}
       if(i>=lines.length||!lines[i].includes('\t')){if(i<lines.length)i++;continue;}
       const statsLine=lines[i];i++;
       if(block.length<2)continue;
-      let name='',buyInPerEntry=0,entryNum=1,date=globalDate;
+      let name='',buyIn=0,date=globalDate;
       for(const l of block){
-        const t=l.trim();
+        const t=l.trim();if(!t)continue;
+        // Date override
         const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
-        const em=t.match(/Вхождение\s*#(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
-        const am=t.match(/^(\d[\d\s]*(?:[.,]\d+)?)\s*[рpРP]\.$/);if(am){buyInPerEntry=numRu(am[1]);continue;}
-        if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold)/i.test(t))continue;
-        // Tournament names always start with Cyrillic — guard against buy-in lines that slipped past am regex
+        // Re-entry / pass line — skip (Вхождение #N or Прохождение #N)
+        if(/(?:Вхождение|Прохождение)\s*#\d/i.test(t))continue;
+        // Game type line — skip
+        if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL)/i.test(t))continue;
+        // Buy-in: any line that starts with a digit (robust — strips non-numeric chars)
+        if(/^\d/.test(t)){buyIn=numRu(t.replace(/[^\d,. ]/g,'').trim());continue;}
+        // Tournament name: must start with Cyrillic letter
         if(t.length>3&&/^[а-яёА-ЯЁ]/.test(t))name=t;
       }
+      if(!name)continue;
       const parts=statsLine.split('\t');
-      let paidTotal=buyInPerEntry,place=0,prize=0;
-      const pm0=parts[0]?parts[0].match(/(\d[\d\s]*(?:[.,]\d+)?)\s*р\./):null;if(pm0)paidTotal=numRu(pm0[1]);
-      if(parts[1])place=parseInt(parts[1].trim())||0;
-      const pm2=parts[2]?parts[2].match(/(\d[\d\s]*(?:[.,]\d+)?)\s*р\./):null;if(pm2)prize=numRu(pm2[1]);
-      raw.push({name,buyInPerEntry,entryNum,paidTotal,place,prize,date});
+      const paidActual=numIn(parts[0])||buyIn;
+      const place=parts[1]?parseInt(parts[1].trim())||0:0;
+      const prize=numIn(parts[2]);
+      const type=detectType(name);
+      const league=detectLeague(name);
+      sessions.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+        date,type,tournamentName:name,stakes:buyIn?buyIn+' ₽':'',
+        buyInPerEntry:buyIn,entries:1,rebuys:0,buyIn:paidActual,
+        prize,profit:prize-paidActual,place,totalPlayers:0,
+        isLeague:!!league,leagueId:league?league.id:'',leagueName:league?league.name:'',
+        source:'import',note:''});
     }
-
-    // Sort by (date, name, entryNum asc) so re-entry #1 is always processed before #2
-    raw.sort((a,b)=>{
-      const dc=a.date.localeCompare(b.date);if(dc)return dc;
-      const nc=a.name.localeCompare(b.name);if(nc)return nc;
-      return a.entryNum-b.entryNum;
-    });
-
-    // Merge re-entries: only entryNum>1 attaches to an existing instance.
-    // Separate plays of the same tournament on the same day → separate sessions.
-    const instances=[];
-    for(const r of raw){
-      const target=r.entryNum>1
-        ?instances.find(m=>m.name===r.name&&m.date===r.date&&m.maxEntryNum===r.entryNum-1)
-        :null;
-      if(target){
-        target.totalPaid+=r.paidTotal;
-        target.maxEntryNum=r.entryNum;
-        if(r.prize>target.bestPrize){target.bestPrize=r.prize;target.bestPlace=r.place;}
-        else if(r.place>0&&target.bestPlace===0)target.bestPlace=r.place;
-      } else {
-        instances.push({name:r.name,date:r.date,buyInPerEntry:r.buyInPerEntry,totalPaid:r.paidTotal,maxEntryNum:r.entryNum||1,bestPrize:r.prize,bestPlace:r.place});
-      }
-    }
-    const merged=instances; // alias for the map below
-    return merged.map(m=>{
-      const entries=m.maxEntryNum||1;
-      const buyIn=m.totalPaid||m.buyInPerEntry*entries;
-      const rebuys=buyIn-m.buyInPerEntry;
-      const type=detectType(m.name);
-      const league=detectLeague(m.name);
-      return{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),date:m.date,type,tournamentName:m.name,
-        stakes:m.buyInPerEntry?m.buyInPerEntry+' ₽':'',buyInPerEntry:m.buyInPerEntry,entries,rebuys,buyIn,
-        prize:m.bestPrize,profit:m.bestPrize-buyIn,place:m.bestPlace,totalPlayers:0,
-        isLeague:!!league,leagueId:league?league.id:'',leagueName:league?league.name:'',source:'import',note:''};
-    });
+    return sessions;
   },
   parseHandHistory(text){
     const sessions={};
