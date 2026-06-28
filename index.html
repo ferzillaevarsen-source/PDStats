@@ -538,9 +538,12 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
   </div>
   <div x-show="importError" class="mb-4 p-3 rounded-xl text-sm" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);color:#fca5a5" x-text="importError"></div>
   <div x-show="importSuccess" class="mb-4 p-3 rounded-xl text-sm" style="background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);color:#6ee7b7" x-text="importSuccess"></div>
-  <div class="flex gap-3">
+  <div class="flex gap-3 flex-wrap">
     <button class="btn-primary flex-1" @click="runImport()" :disabled="!importText.trim()||importing">
       <i class="fas fa-upload mr-2"></i><span x-text="importing?'Обработка...':'Импортировать'"></span>
+    </button>
+    <button class="btn-ghost" @click="importFromTxt()" title="Загрузить историю из .txt файла">
+      <i class="fas fa-file-alt mr-2"></i>Загрузить .TXT
     </button>
     <button class="btn-ghost" @click="openAddModal()"><i class="fas fa-plus mr-2"></i>Вручную</button>
   </div>
@@ -969,6 +972,18 @@ function app() { return {
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     this.showToast(`Экспортировано ${this.sessions.length} записей`);
   },
+  importFromTxt(){
+    const inp=document.createElement('input');inp.type='file';inp.accept='.txt,.text,text/plain';
+    inp.onchange=async e=>{
+      const f=e.target.files[0];if(!f)return;
+      try{
+        this.importText=await f.text();
+        this.page='import';
+        this.showToast('Файл загружен: '+f.name+' ('+this.importText.length.toLocaleString()+' симв.)');
+      }catch{this.showToast('Не удалось прочитать файл','error');}
+    };
+    inp.click();
+  },
   importFromJSON(){
     const inp=document.createElement('input');inp.type='file';inp.accept='.json';
     inp.onchange=async e=>{
@@ -1029,7 +1044,8 @@ function app() { return {
         const em=t.match(/Вхождение\s*#(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
         const am=t.match(/^(\d[\d\s]*(?:[.,]\d+)?)\s*р\.$/);if(am){buyInPerEntry=numRu(am[1]);continue;}
         if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold)/i.test(t))continue;
-        if(t.length>3)name=t.replace(/\s*\d[\d\s]*(?:[.,]\d+)?\s*р\.\s*$/,'').trim()||t;
+        // Keep full name including guarantee (e.g. "Супер Нокаут 30 000 р.") — guarantee IS part of the unique name
+        if(t.length>3)name=t;
       }
       const parts=statsLine.split('\t');
       let paidTotal=buyInPerEntry,place=0,prize=0;
@@ -1038,16 +1054,32 @@ function app() { return {
       const pm2=parts[2]?parts[2].match(/(\d[\d\s]*(?:[.,]\d+)?)\s*р\./):null;if(pm2)prize=numRu(pm2[1]);
       raw.push({name,buyInPerEntry,entryNum,paidTotal,place,prize,date});
     }
-    const merged={};
+
+    // Sort by (date, name, entryNum asc) so re-entry #1 is always processed before #2
+    raw.sort((a,b)=>{
+      const dc=a.date.localeCompare(b.date);if(dc)return dc;
+      const nc=a.name.localeCompare(b.name);if(nc)return nc;
+      return a.entryNum-b.entryNum;
+    });
+
+    // Merge re-entries: only entryNum>1 attaches to an existing instance.
+    // Separate plays of the same tournament on the same day → separate sessions.
+    const instances=[];
     for(const r of raw){
-      const key=r.name+'|'+r.date;
-      if(!merged[key])merged[key]={name:r.name,date:r.date,buyInPerEntry:r.buyInPerEntry,totalPaid:0,maxEntryNum:0,bestPrize:0,bestPlace:0};
-      const m=merged[key];m.totalPaid+=r.paidTotal;
-      if(r.entryNum>m.maxEntryNum)m.maxEntryNum=r.entryNum;
-      if(r.prize>m.bestPrize){m.bestPrize=r.prize;m.bestPlace=r.place;}
-      else if(r.place>0&&m.bestPlace===0)m.bestPlace=r.place;
+      const target=r.entryNum>1
+        ?instances.find(m=>m.name===r.name&&m.date===r.date&&m.maxEntryNum===r.entryNum-1)
+        :null;
+      if(target){
+        target.totalPaid+=r.paidTotal;
+        target.maxEntryNum=r.entryNum;
+        if(r.prize>target.bestPrize){target.bestPrize=r.prize;target.bestPlace=r.place;}
+        else if(r.place>0&&target.bestPlace===0)target.bestPlace=r.place;
+      } else {
+        instances.push({name:r.name,date:r.date,buyInPerEntry:r.buyInPerEntry,totalPaid:r.paidTotal,maxEntryNum:r.entryNum||1,bestPrize:r.prize,bestPlace:r.place});
+      }
     }
-    return Object.values(merged).map(m=>{
+    const merged=instances; // alias for the map below
+    return merged.map(m=>{
       const entries=m.maxEntryNum||1;
       const buyIn=m.totalPaid||m.buyInPerEntry*entries;
       const rebuys=buyIn-m.buyInPerEntry;
