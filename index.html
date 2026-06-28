@@ -622,14 +622,21 @@ const LEAGUES = [
   },
 ];
 
+function leagueMatchName(tName, inputName) {
+  // Requires ALL words with length>4 from the league tournament name to appear in the input.
+  // For short names (no words >4 chars), requires the full clean name as a substring.
+  const clean = tName.toLowerCase().replace(/[«»"'«»]/g,'');
+  const input = inputName.toLowerCase().replace(/[«»"'«»]/g,'');
+  const sigWords = clean.split(/\s+/).filter(w => w.length > 4);
+  if (sigWords.length >= 2) return sigWords.every(w => input.includes(w));
+  return input.includes(clean); // short name → exact substring
+}
+
 function detectLeague(name) {
   if (!name) return null;
-  const l = name.toLowerCase();
   for (const lg of LEAGUES) {
     for (const t of lg.tournaments) {
-      // Match by significant keywords from tournament name
-      const keywords = t.name.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3);
-      if (keywords.some(k => l.includes(k))) return lg;
+      if (leagueMatchName(t.name, name)) return lg;
     }
   }
   return null;
@@ -779,16 +786,13 @@ function app() {
     },
     leagueSessionsFor(id){ return[...this.sessions].filter(s=>s.leagueId===id).sort((a,b)=>b.date.localeCompare(a.date)); },
     hasPlayedTournament(tName){
-      const k=tName.toLowerCase().replace(/[«»"']/g,'');
-      return this.sessions.some(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k.split(' ').filter(w=>w.length>3)[0]||k));
+      return this.sessions.some(s=>leagueMatchName(tName,s.tournamentName||''));
     },
     getTournamentProfit(tName){
-      const k=tName.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3)[0]||tName.toLowerCase();
-      return this.sessions.filter(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k)).reduce((a,s)=>a+s.profit,0);
+      return this.sessions.filter(s=>leagueMatchName(tName,s.tournamentName||'')).reduce((a,s)=>a+s.profit,0);
     },
     getTournamentCount(tName){
-      const k=tName.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3)[0]||tName.toLowerCase();
-      return this.sessions.filter(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k)).length;
+      return this.sessions.filter(s=>leagueMatchName(tName,s.tournamentName||'')).length;
     },
 
     // ── Sessions page ──
@@ -829,17 +833,34 @@ function app() {
     parsePokerDomList(text){
       const raw=[];
       const lines=text.split('\n').map(l=>l.trimEnd());
+
+      // Extract global date from the header (e.g. "20/06/2026" or "20.06.2026")
+      let globalDate=this.importDate||new Date().toISOString().slice(0,10);
+      for(let j=0;j<Math.min(8,lines.length);j++){
+        const hd=lines[j].trim().match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/);
+        if(hd){globalDate=`${hd[3]}-${hd[2]}-${hd[1]}`;break;}
+      }
+
       let i=0;
-      while(i<lines.length&&(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())||lines[i].trim()===''))i++;
+      // Skip header: dates, empty lines, game-type headers, column headers
+      while(i<lines.length&&(
+        /^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/.test(lines[i].trim())||
+        /^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||
+        /^Начало/i.test(lines[i].trim())||
+        lines[i].trim()===''
+      ))i++;
+
       while(i<lines.length){
         while(i<lines.length&&lines[i].trim()==='')i++;
         if(i>=lines.length)break;
+        // Skip any stray header lines inside the body
+        if(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())){i++;continue;}
         const block=[];
         while(i<lines.length&&lines[i].trim()!==''&&!lines[i].includes('\t')){block.push(lines[i]);i++;}
         if(i>=lines.length||!lines[i].includes('\t')){if(i<lines.length)i++;continue;}
         const statsLine=lines[i];i++;
         if(block.length<2)continue;
-        let name='',buyInPerEntry=0,entryNum=1,date=null;
+        let name='',buyInPerEntry=0,entryNum=1,date=globalDate;
         for(const l of block){
           const t=l.trim();
           const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);
@@ -849,7 +870,8 @@ function app() {
           const am=t.match(/^(\d[\d\s]*(?:[.,]\d+)?)\s*р\.$/);
           if(am){buyInPerEntry=numRu(am[1]);continue;}
           if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold)/i.test(t))continue;
-          if(t.length>3)name=t;
+          // Strip trailing prize amount from tournament name (e.g. "Супер Нокаут 30 000 р." → "Супер Нокаут")
+          if(t.length>3)name=t.replace(/\s*\d[\d\s]*(?:[.,]\d+)?\s*р\.\s*$/, '').trim()||t;
         }
         const parts=statsLine.split('\t');
         let paidTotal=buyInPerEntry,place=0,prize=0;
