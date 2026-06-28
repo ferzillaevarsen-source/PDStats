@@ -1060,7 +1060,7 @@ function app() { return {
         // Re-entry (handles #2, №2, Вхождение 2, Прохождение №2)
         const em=t.match(/(?:Вхождение|Прохождение)[^0-9]*(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
         // Game type (skip)
-        if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL)/i.test(t))continue;
+        if(/^(?:Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL)(?:\s|$)/i.test(t))continue;
         // Digit-start = buy-in amount
         if(/^\d/.test(t)){buyIn=numRu(t.replace(/[^\d,. ]/g,'').trim());continue;}
         // Cyrillic-start = tournament name (last match wins)
