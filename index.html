@@ -29,34 +29,38 @@ body{font-family:'Inter',sans-serif;background:#080812;color:#e2e8f0;min-height:
 .btn-ghost{background:#13132a;color:#9ca3af;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid rgba(255,255,255,0.07);transition:all .2s}
 .btn-ghost:hover{background:#1e1e35;color:#e2e8f0}
 .btn-danger{background:#ff3333;color:#fff;padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer;border:none;transition:all .2s}
-.btn-danger:hover{background:#ff5555}
 input,select,textarea{background:#13132a;border:1px solid rgba(255,255,255,0.1);color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:13px;outline:none;font-family:'Inter',sans-serif;width:100%}
 input:focus,select:focus,textarea:focus{border-color:#00c896}
 input::placeholder,textarea::placeholder{color:#2d3748}
-.pos{color:#00c896}
-.neg{color:#ff4444}
-.neu{color:#4b5563}
+.pos{color:#00c896}.neg{color:#ff4444}.neu{color:#4b5563}
 .tbl-head th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#4b5563;padding:10px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.06)}
 .tbl-head th:first-child{text-align:left}
 .tbl-row td{padding:10px 14px;font-size:13px;text-align:right;border-bottom:1px solid rgba(255,255,255,0.04)}
 .tbl-row td:first-child{text-align:left}
-.tbl-row:hover td{background:rgba(255,255,255,0.025)}
+.tbl-row:hover td{background:rgba(255,255,255,0.02)}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
 .badge-mtt{background:rgba(99,102,241,.2);color:#a5b4fc}
 .badge-sng{background:rgba(0,200,150,.2);color:#6ee7b7}
 .badge-cash{background:rgba(245,158,11,.2);color:#fcd34d}
 .badge-wf{background:rgba(236,72,153,.2);color:#f9a8d4}
-.badge-league{background:rgba(139,92,246,.2);color:#c4b5fd}
-.cal-day{border-radius:10px;padding:8px;min-height:70px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(255,255,255,0.05);transition:all .2s}
+.cal-day{border-radius:10px;padding:8px;min-height:68px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(255,255,255,0.05);transition:all .2s}
 .cal-day.has-profit{background:linear-gradient(135deg,#052e16,#064e3b);border-color:#10b981}
 .cal-day.has-loss{background:linear-gradient(135deg,#450a0a,#7f1d1d);border-color:#ef4444}
-.cal-day.empty-day{background:rgba(255,255,255,0.025)}
 .cal-day.no-games{background:rgba(255,255,255,0.015);border-color:transparent}
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#1e1e35;border-radius:2px}
-kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace;color:#9ca3af}
 .range-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:#1a1a2e;color:#9ca3af}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1e1e35;border-radius:2px}
+kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace;color:#9ca3af}
+
+/* League cards */
+.league-card{border-radius:14px;padding:18px;cursor:pointer;transition:all .25s;border:2px solid transparent;position:relative;overflow:hidden}
+.league-card:hover{transform:translateY(-2px)}
+.league-card.selected{border-color:var(--lc)!important;background:color-mix(in srgb,var(--lc) 12%,#0f0f1e)!important}
+.league-card .lc-glow{position:absolute;top:-30px;right:-30px;width:100px;height:100px;border-radius:50%;opacity:.15;filter:blur(20px)}
+
+/* Tournament checklist */
+.tour-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.05);margin-bottom:6px;transition:all .2s}
+.tour-item.played{background:rgba(0,200,150,0.08);border-color:rgba(0,200,150,0.25)}
+.tour-item.not-played{background:rgba(255,255,255,0.02)}
 </style>
 </head>
 <body x-data="app()" x-init="init()">
@@ -77,7 +81,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <button class="nav-link" :class="page==='import'&&'active'" @click="page='import'"><i class="fas fa-upload mr-1.5"></i>Импорт</button>
       <button class="nav-link" :class="page==='sessions'&&'active'" @click="page='sessions'"><i class="fas fa-table-list mr-1.5"></i>Сессии</button>
     </div>
-    <div class="text-xs" style="color:#5a6070" x-text="sessions.length + ' записей'"></div>
+    <div style="font-size:12px;color:#374151" x-text="sessions.length+' записей'"></div>
   </div>
 </nav>
 
@@ -85,13 +89,12 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 
 <!-- ═══ STATS ═══ -->
 <div x-show="page==='stats'">
-  <!-- Empty -->
   <div x-show="sessions.length===0" class="text-center py-24">
     <div style="width:56px;height:56px;background:rgba(0,200,150,.1);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
       <i class="fas fa-chart-area" style="color:#00c896;font-size:20px"></i>
     </div>
     <h2 class="text-xl font-bold text-white mb-2">Нет данных</h2>
-    <p style="color:#4b5563;font-size:14px" class="mb-5">Импортируйте историю из ПокерДом или добавьте сессию вручную</p>
+    <p style="color:#4b5563;font-size:14px" class="mb-5">Импортируйте историю или добавьте сессию вручную</p>
     <div class="flex gap-3 justify-center">
       <button class="btn-primary" @click="page='import'"><i class="fas fa-upload mr-2"></i>Импортировать</button>
       <button class="btn-ghost" @click="openAddModal()"><i class="fas fa-plus mr-2"></i>Вручную</button>
@@ -99,7 +102,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
   </div>
 
   <div x-show="sessions.length>0">
-    <!-- Sub-tabs -->
     <div class="flex items-center gap-2 mb-4">
       <button class="sub-tab" :class="statsTab==='all'&&'active'" @click="statsTab='all'">Общее</button>
       <button class="sub-tab" :class="statsTab==='mtt'&&'active'" @click="statsTab='mtt'">Tournaments</button>
@@ -107,7 +109,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <button class="sub-tab" :class="statsTab==='windfall'&&'active'" @click="statsTab='windfall'">Windfall</button>
     </div>
 
-    <!-- Date filter -->
     <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
       <span style="font-size:12px;color:#5a6070">Начало</span>
       <input type="date" x-model="dateFrom" style="width:auto">
@@ -122,36 +123,24 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <button class="btn-primary ml-auto" @click="applyFilter()">Применить</button>
     </div>
 
-    <!-- Summary cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Результат</div>
+      <div class="card p-4"><div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Результат</div>
         <div style="font-size:22px;font-weight:800" :class="totalProfit>=0?'pos':'neg'" x-text="(totalProfit>=0?'+':'')+fmt(totalProfit)"></div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px" x-text="statSessions.length+' турниров'"></div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">ROI</div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px" x-text="statSessions.length+' турниров'"></div></div>
+      <div class="card p-4"><div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">ROI</div>
         <div style="font-size:22px;font-weight:800" :class="roi>=0?'pos':'neg'" x-text="(roi>=0?'+':'')+roi.toFixed(1)+'%'"></div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px">Возврат на инвест.</div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">ITM</div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px">Возврат на инвест.</div></div>
+      <div class="card p-4"><div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">ITM</div>
         <div style="font-size:22px;font-weight:800;color:#00c896" x-text="itmPct.toFixed(1)+'%'"></div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px">В призах</div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Ср. взнос</div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px">В призах</div></div>
+      <div class="card p-4"><div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Ср. взнос</div>
         <div style="font-size:22px;font-weight:800;color:#e2e8f0" x-text="fmt(avgBuyIn)"></div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px">на турнир</div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Реентри</div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px">на турнир</div></div>
+      <div class="card p-4"><div style="font-size:10px;color:#4b5563;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Реентри</div>
         <div style="font-size:22px;font-weight:800;color:#e2e8f0" x-text="fmt(totalRebuys)"></div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px">суммарно</div>
-      </div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px">суммарно</div></div>
     </div>
 
-    <!-- Chart -->
     <div class="card p-5 mb-4">
       <div class="flex items-center justify-between mb-3">
         <span style="font-size:13px;font-weight:600;color:#9ca3af">Кривая профита</span>
@@ -160,32 +149,20 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <div style="height:260px"><canvas id="mainChart"></canvas></div>
     </div>
 
-    <!-- Search -->
     <div class="flex items-center gap-3 mb-4">
-      <button class="btn-ghost"><i class="fas fa-sliders mr-2"></i>Фильтр турниров</button>
       <div style="flex:1;position:relative">
         <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#4b5563;font-size:12px"></i>
         <input type="text" x-model="searchQuery" placeholder="Поиск по названию турнира..." style="padding-left:34px">
       </div>
-      <button class="btn-danger" @click="searchQuery='';dateFrom='';dateTo='';preset='all'">Сбросить</button>
+      <button class="btn-danger" @click="searchQuery='';dateFrom='';dateTo='';preset='all';activeFrom='';activeTo=''">Сбросить</button>
     </div>
 
-    <!-- Stakes table -->
     <div class="card overflow-x-auto">
       <table class="w-full">
         <thead class="tbl-head"><tr>
-          <th>Взносы</th>
-          <th>Турниры</th>
-          <th>Взносы</th>
-          <th>Rebuys</th>
-          <th>Общ. сумма</th>
-          <th>Призы</th>
-          <th>Топ 9,%</th>
-          <th>Топ 3,%</th>
-          <th>1 место,%</th>
-          <th>Результат</th>
-          <th>ROI,%</th>
-          <th>ITM,%</th>
+          <th>Взносы</th><th>Турниры</th><th>Взносы ₽</th><th>Rebuys ₽</th>
+          <th>Общ. сумма</th><th>Призы</th><th>Топ 9,%</th><th>Топ 3,%</th>
+          <th>1 место,%</th><th>Результат</th><th>ROI,%</th><th>ITM,%</th>
         </tr></thead>
         <tbody>
           <template x-for="r in stakeRanges" :key="r.label">
@@ -204,7 +181,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
               <td x-text="r.itm.toFixed(1)"></td>
             </tr>
           </template>
-          <!-- Total row -->
           <tr class="tbl-row" style="border-top:2px solid rgba(255,255,255,0.1)">
             <td style="font-weight:700;color:#9ca3af">ИТОГО</td>
             <td style="font-weight:600" x-text="statSessions.length"></td>
@@ -227,7 +203,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 
 <!-- ═══ CALENDAR ═══ -->
 <div x-show="page==='calendar'">
-  <!-- Month header card -->
   <div class="card p-5 mb-4" style="background:linear-gradient(135deg,#1a0a3a,#0f1a3a)">
     <div class="flex items-center justify-between mb-4">
       <button @click="calPrevMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-left"></i></button>
@@ -237,63 +212,50 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       </div>
       <button @click="calNextMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-right"></i></button>
     </div>
-
-    <!-- Month stats -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-coins mr-1"></i>Результат</div>
-        <div style="font-size:18px;font-weight:800" :class="calStats.total>=0?'pos':'neg'"
-             x-text="(calStats.total>=0?'+':'')+fmt(calStats.total)"></div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px">Результат</div>
+        <div style="font-size:18px;font-weight:800" :class="calStats.total>=0?'pos':'neg'" x-text="(calStats.total>=0?'+':'')+fmt(calStats.total)"></div>
       </div>
       <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-trophy mr-1"></i>Турниры</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px">Турниры</div>
         <div style="font-size:18px;font-weight:800;color:#e2e8f0" x-text="fmt(calStats.mtt)"></div>
       </div>
       <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-chart-bar mr-1"></i>Ср. взнос</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px">Ср. взнос</div>
         <div style="font-size:18px;font-weight:800;color:#e2e8f0" x-text="fmt(calStats.avgBuyIn)"></div>
       </div>
       <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-star mr-1" style="color:#22c55e"></i>Лучший день</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-star" style="color:#22c55e"></i> Лучший день</div>
         <div style="font-size:18px;font-weight:800;color:#00c896" x-text="calStats.best?fmt(calStats.best.profit):'—'"></div>
         <div style="font-size:11px;color:#4b5563" x-text="calStats.best?calStats.best.dayLabel:''"></div>
       </div>
       <div style="background:rgba(0,0,0,.3);border-radius:10px;padding:12px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-star mr-1" style="color:#ef4444"></i>Худший день</div>
+        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:4px"><i class="fas fa-star" style="color:#ef4444"></i> Худший день</div>
         <div style="font-size:18px;font-weight:800;color:#ff4444" x-text="calStats.worst?fmt(calStats.worst.profit):'—'"></div>
         <div style="font-size:11px;color:#4b5563" x-text="calStats.worst?calStats.worst.dayLabel:''"></div>
       </div>
     </div>
   </div>
-
-  <!-- Calendar grid -->
   <div class="card p-5">
-    <!-- Day headers -->
     <div class="grid grid-cols-7 gap-2 mb-2">
       <template x-for="d in ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС']">
-        <div style="text-align:center;font-size:11px;font-weight:600;color:#4b5563;padding:6px" x-text="d"></div>
+        <div style="text-align:center;font-size:11px;font-weight:600;color:#4b5563;padding:4px" x-text="d"></div>
       </template>
     </div>
-    <!-- Days -->
     <div class="grid grid-cols-7 gap-2">
       <template x-for="cell in calendarCells" :key="cell.key">
         <div>
-          <!-- Empty cell before month start -->
-          <div x-show="cell.empty" style="min-height:70px"></div>
-          <!-- Day cell -->
-          <div x-show="!cell.empty" class="cal-day"
-               :class="cell.profit!==null?(cell.profit>0?'has-profit':'has-loss'):'no-games'">
+          <div x-show="cell.empty" style="min-height:68px"></div>
+          <div x-show="!cell.empty" class="cal-day" :class="cell.profit!==null?(cell.profit>0?'has-profit':'has-loss'):'no-games'">
             <div style="font-size:13px;font-weight:700;color:#9ca3af" x-text="cell.day"></div>
             <template x-if="cell.profit!==null">
               <div>
-                <div style="font-size:13px;font-weight:700" :class="cell.profit>=0?'pos':'neg'"
-                     x-text="(cell.profit>=0?'+':'')+fmtK(cell.profit)"></div>
+                <div style="font-size:13px;font-weight:700" :class="cell.profit>=0?'pos':'neg'" x-text="(cell.profit>=0?'+':'')+fmtK(cell.profit)"></div>
                 <div style="font-size:10px;color:#6b7280" x-text="cell.count+' тур.'"></div>
               </div>
             </template>
-            <template x-if="cell.profit===null">
-              <div style="font-size:10px;color:#374151">Нет игр</div>
-            </template>
+            <template x-if="cell.profit===null"><div style="font-size:10px;color:#374151">Нет игр</div></template>
           </div>
         </div>
       </template>
@@ -305,97 +267,124 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 <div x-show="page==='leagues'">
   <div class="flex items-center justify-between mb-5">
     <div>
-      <h2 style="font-size:20px;font-weight:800;color:white">Лиги и рейтинг</h2>
-      <p style="font-size:13px;color:#4b5563;margin-top:2px">Еженедельные турниры и рейтинговые события</p>
+      <h2 style="font-size:20px;font-weight:800;color:white">Лиги ПокерДом</h2>
+      <p style="font-size:13px;color:#4b5563;margin-top:2px">Рейтинговые лиги с еженедельным призовым фондом</p>
     </div>
   </div>
 
-  <div x-show="leagueSessions.length===0" class="text-center py-16" style="color:#4b5563">
-    <i class="fas fa-trophy text-4xl mb-3"></i>
-    <p style="font-size:14px">Нет лиговых турниров</p>
-    <p style="font-size:12px;margin-top:6px">Турниры с ключевыми словами «Рейтинг», «Лига», «Серия» попадают сюда автоматически</p>
+  <!-- 4 league cards -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <template x-for="lg in LEAGUES" :key="lg.id">
+      <div class="league-card" :class="selectedLeague===lg.id&&'selected'"
+           :style="`--lc:${lg.color};background:#0f0f1e;border-color:rgba(255,255,255,0.07)`"
+           @click="selectedLeague=lg.id">
+        <div class="lc-glow" :style="`background:${lg.color}`"></div>
+        <!-- Icon + name -->
+        <div class="flex items-center gap-2 mb-3">
+          <div :style="`background:${lg.color}22;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center`">
+            <i :class="lg.icon" :style="`color:${lg.color};font-size:14px`"></i>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#e2e8f0;line-height:1.3" x-text="lg.name"></div>
+        </div>
+        <!-- Prize pool -->
+        <div style="font-size:11px;color:#6b7280;margin-bottom:2px">Призовой фонд</div>
+        <div style="font-size:16px;font-weight:800;margin-bottom:10px" :style="`color:${lg.color}`" x-text="fmt(lg.prize)"></div>
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-1">
+          <div style="background:rgba(0,0,0,.3);border-radius:6px;padding:6px;text-align:center">
+            <div style="font-size:10px;color:#6b7280">Тур.</div>
+            <div style="font-size:14px;font-weight:700;color:#e2e8f0" x-text="leagueStats(lg.id).count"></div>
+          </div>
+          <div style="background:rgba(0,0,0,.3);border-radius:6px;padding:6px;text-align:center">
+            <div style="font-size:10px;color:#6b7280">ROI</div>
+            <div style="font-size:13px;font-weight:700" :class="leagueStats(lg.id).roi>=0?'pos':'neg'"
+                 x-text="(leagueStats(lg.id).roi>=0?'+':'')+leagueStats(lg.id).roi.toFixed(0)+'%'"></div>
+          </div>
+          <div style="background:rgba(0,0,0,.3);border-radius:6px;padding:6px;text-align:center">
+            <div style="font-size:10px;color:#6b7280">Профит</div>
+            <div style="font-size:12px;font-weight:700" :class="leagueStats(lg.id).profit>=0?'pos':'neg'"
+                 x-text="fmtK(leagueStats(lg.id).profit)"></div>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 
-  <div x-show="leagueSessions.length>0" class="space-y-4">
-    <!-- League summary -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;margin-bottom:6px">Результат</div>
-        <div style="font-size:20px;font-weight:800" :class="leagueTotal>=0?'pos':'neg'"
-             x-text="(leagueTotal>=0?'+':'')+fmt(leagueTotal)"></div>
+  <!-- Selected league detail -->
+  <template x-if="selectedLeague">
+    <div x-data="{get lg(){ return LEAGUES.find(l=>l.id===selectedLeague); }}">
+      <div class="flex items-center gap-3 mb-4">
+        <div :style="`width:4px;height:24px;border-radius:2px;background:${lg.color}`"></div>
+        <h3 style="font-size:16px;font-weight:700;color:white" x-text="lg.name"></h3>
+        <span style="font-size:12px;color:#6b7280" x-text="lg.tournaments.length+' турниров в лиге'"></span>
       </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;margin-bottom:6px">Турниров</div>
-        <div style="font-size:20px;font-weight:800;color:#e2e8f0" x-text="leagueSessions.length"></div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;margin-bottom:6px">ROI</div>
-        <div style="font-size:20px;font-weight:800" :class="leagueRoi>=0?'pos':'neg'"
-             x-text="(leagueRoi>=0?'+':'')+leagueRoi.toFixed(1)+'%'"></div>
-      </div>
-      <div class="card p-4">
-        <div style="font-size:10px;color:#4b5563;text-transform:uppercase;margin-bottom:6px">ITM</div>
-        <div style="font-size:20px;font-weight:800;color:#00c896" x-text="leagueItm.toFixed(1)+'%'"></div>
-      </div>
-    </div>
 
-    <!-- Weekly breakdown -->
-    <div class="card">
-      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        <h3 style="font-size:14px;font-weight:600;color:#e2e8f0">По неделям</h3>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="tbl-head"><tr>
-            <th>Неделя</th>
-            <th>Турниров</th>
-            <th>Взносы</th>
-            <th>Призы</th>
-            <th>Результат</th>
-            <th>ROI,%</th>
-            <th>ITM,%</th>
-          </tr></thead>
-          <tbody>
-            <template x-for="w in leagueWeekly" :key="w.key">
-              <tr class="tbl-row">
-                <td style="color:#9ca3af" x-text="w.label"></td>
-                <td x-text="w.count"></td>
-                <td x-text="fmt(w.buyIn)"></td>
-                <td x-text="fmt(w.prize)"></td>
-                <td :class="w.profit>=0?'pos font-bold':'neg font-bold'" x-text="(w.profit>=0?'+':'')+fmt(w.profit)"></td>
-                <td :class="w.roi>=0?'pos':'neg'" x-text="(w.roi>=0?'+':'')+w.roi.toFixed(1)"></td>
-                <td x-text="w.itm.toFixed(1)"></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- League sessions list -->
-    <div class="card overflow-x-auto">
-      <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.06)">
-        <h3 style="font-size:14px;font-weight:600;color:#e2e8f0">Турниры</h3>
-      </div>
-      <table class="w-full">
-        <thead class="tbl-head"><tr>
-          <th>Дата</th><th>Турнир</th><th>Ставки</th><th>Взнос</th><th>Приз</th><th>Профит</th><th>Место</th>
-        </tr></thead>
-        <tbody>
-          <template x-for="s in leagueSessions" :key="s.id">
-            <tr class="tbl-row">
-              <td style="color:#9ca3af;white-space:nowrap" x-text="fmtDate(s.date)"></td>
-              <td style="max-width:220px"><span class="block truncate" style="color:#e2e8f0" x-text="s.tournamentName||'—'" :title="s.tournamentName"></span></td>
-              <td><span class="badge badge-league" x-text="s.stakes||'—'"></span></td>
-              <td x-text="fmt(s.buyIn)"></td>
-              <td x-text="s.prize>0?fmt(s.prize):'—'"></td>
-              <td :class="s.profit>=0?'pos font-bold':'neg font-bold'" x-text="(s.profit>=0?'+':'')+fmt(s.profit)"></td>
-              <td x-text="s.place||'—'"></td>
-            </tr>
+      <!-- Tournament checklist -->
+      <div class="card p-5 mb-4">
+        <div style="font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
+          Турниры лиги
+        </div>
+        <div class="grid lg:grid-cols-2 gap-2">
+          <template x-for="t in lg.tournaments" :key="t.name">
+            <div class="tour-item" :class="hasPlayedTournament(t.name)?'played':'not-played'">
+              <div :style="`width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;${hasPlayedTournament(t.name)?'background:'+lg.color+'33;':'background:rgba(255,255,255,0.05)'}`">
+                <i :class="hasPlayedTournament(t.name)?'fas fa-check':'fas fa-circle'"
+                   :style="`font-size:9px;color:${hasPlayedTournament(t.name)?lg.color:'#374151'}`"></i>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500" :style="`color:${hasPlayedTournament(t.name)?'#e2e8f0':'#6b7280'}`" x-text="t.name"></div>
+                <div style="font-size:11px;color:#4b5563" x-text="'Гарантия: '+fmt(t.guarantee)"></div>
+              </div>
+              <template x-if="hasPlayedTournament(t.name)">
+                <div style="text-align:right">
+                  <div style="font-size:12px;font-weight:700"
+                       :class="getTournamentProfit(t.name)>=0?'pos':'neg'"
+                       x-text="(getTournamentProfit(t.name)>=0?'+':'')+fmtK(getTournamentProfit(t.name))"></div>
+                  <div style="font-size:10px;color:#6b7280" x-text="getTournamentCount(t.name)+'×'"></div>
+                </div>
+              </template>
+            </div>
           </template>
-        </tbody>
-      </table>
+        </div>
+      </div>
+
+      <!-- League sessions -->
+      <template x-if="leagueSessionsFor(selectedLeague).length>0">
+        <div class="card overflow-x-auto">
+          <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06)">
+            <h4 style="font-size:13px;font-weight:600;color:#e2e8f0">История в лиге</h4>
+          </div>
+          <table class="w-full">
+            <thead class="tbl-head"><tr>
+              <th>Дата</th><th style="text-align:left">Турнир</th><th>Вхождений</th>
+              <th>Взнос</th><th>Приз</th><th>Профит</th><th>Место</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="s in leagueSessionsFor(selectedLeague)" :key="s.id">
+                <tr class="tbl-row">
+                  <td style="color:#9ca3af;white-space:nowrap" x-text="fmtDate(s.date)"></td>
+                  <td style="text-align:left;max-width:200px"><span class="block truncate" x-text="s.tournamentName||'—'" :title="s.tournamentName"></span></td>
+                  <td style="color:#6b7280" x-text="s.entries>1?s.entries+'×':'1×'"></td>
+                  <td x-text="fmt(s.buyIn)"></td>
+                  <td x-text="s.prize>0?fmt(s.prize):'—'"></td>
+                  <td :class="s.profit>=0?'pos font-bold':'neg font-bold'" x-text="(s.profit>=0?'+':'')+fmt(s.profit)"></td>
+                  <td style="color:#6b7280" x-text="s.place||'—'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
+      <div x-show="leagueSessionsFor(selectedLeague).length===0" class="card p-8 text-center" style="color:#4b5563">
+        <i class="fas fa-inbox" style="font-size:28px;margin-bottom:8px;display:block"></i>
+        <p style="font-size:13px">Турниры этой лиги ещё не сыграны</p>
+        <p style="font-size:12px;margin-top:4px;color:#374151">Импортируйте историю — записи определятся автоматически</p>
+      </div>
     </div>
+  </template>
+
+  <div x-show="!selectedLeague" class="text-center py-8" style="color:#4b5563;font-size:13px">
+    Выберите лигу выше, чтобы увидеть детали
   </div>
 </div>
 
@@ -403,39 +392,35 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 <div x-show="page==='import'" class="max-w-2xl mx-auto">
   <h2 style="font-size:20px;font-weight:800;color:white;margin-bottom:4px">Импорт истории</h2>
   <p style="font-size:13px;color:#4b5563;margin-bottom:20px">Вставьте историю турниров из личного кабинета ПокерДом</p>
-
   <div class="card p-5 mb-4" style="border-left:3px solid #00c896">
-    <p style="font-size:13px;font-weight:600;color:white;margin-bottom:8px">Как скопировать историю:</p>
-    <ol style="font-size:13px;color:#6b7280;line-height:1.8;list-style:decimal;padding-left:18px">
-      <li>Войдите в <strong style="color:#9ca3af">Личный кабинет ПокерДом → История</strong></li>
-      <li>Выберите вкладку <strong style="color:#9ca3af">Турниры</strong>, задайте период</li>
+    <p style="font-size:13px;font-weight:600;color:white;margin-bottom:8px">Как скопировать:</p>
+    <ol style="font-size:13px;color:#6b7280;line-height:1.9;list-style:decimal;padding-left:18px">
+      <li>Войдите в <strong style="color:#9ca3af">Личный кабинет → История → Турниры</strong></li>
+      <li>Задайте период</li>
       <li>Выделите всё <kbd>Ctrl+A</kbd>, скопируйте <kbd>Ctrl+C</kbd></li>
       <li>Вставьте сюда <kbd>Ctrl+V</kbd></li>
     </ol>
-    <p style="font-size:12px;color:#374151;margin-top:8px">Реентри (<strong style="color:#6b7280">Вхождение #2, #3...</strong>) автоматически объединяются с основной записью. Если даты не видны в таблице — укажите дату вручную ниже.</p>
+    <p style="font-size:12px;color:#374151;margin-top:8px">
+      <strong style="color:#6b7280">Вхождение #2, #3...</strong> — реентри автоматически объединяются.<br>
+      Лиговые турниры (<i class="fas fa-trophy" style="color:#f59e0b;font-size:10px"></i> ЛПБ, БЛ, ЗЛ, РЛ) определяются по названию автоматически.
+    </p>
   </div>
-
-  <!-- Date override -->
   <div class="card p-4 mb-4">
-    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Дата импортируемых записей (если не определяется автоматически)</label>
+    <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">Дата (если не определяется автоматически)</label>
     <input type="date" x-model="importDate" style="width:auto">
   </div>
-
   <div class="card p-5 mb-4">
     <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:6px">История турниров</label>
-    <textarea x-model="importText" rows="12" style="font-family:monospace;font-size:11px;resize:vertical"
-              placeholder="Вставьте скопированную историю..."></textarea>
+    <textarea x-model="importText" rows="12" style="font-family:monospace;font-size:11px;resize:vertical" placeholder="Вставьте скопированную историю..."></textarea>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:#374151;margin-top:6px">
       <span x-text="importText.length?importText.length.toLocaleString()+' символов':''"></span>
       <button x-show="importText" @click="importText=''" style="color:#4b5563;background:none;border:none;cursor:pointer">Очистить</button>
     </div>
   </div>
-
   <div x-show="importError" x-transition class="mb-4 p-4 rounded-xl text-sm"
        style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);color:#fca5a5" x-text="importError"></div>
   <div x-show="importSuccess" x-transition class="mb-4 p-4 rounded-xl text-sm"
        style="background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);color:#6ee7b7" x-text="importSuccess"></div>
-
   <div class="flex gap-3">
     <button class="btn-primary flex-1" @click="runImport()" :disabled="!importText.trim()||importing">
       <i class="fas fa-upload mr-2"></i><span x-text="importing?'Обработка...':'Импортировать'"></span>
@@ -453,37 +438,32 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
     </div>
     <button class="btn-primary" @click="openAddModal()"><i class="fas fa-plus mr-2"></i>Добавить</button>
   </div>
-
   <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
     <select x-model="sType" style="width:auto">
       <option value="">Все типы</option>
       <option>MTT</option><option>SNG</option><option>Cash</option><option>Windfall</option>
     </select>
+    <select x-model="sLeague" style="width:auto">
+      <option value="">Все лиги</option>
+      <template x-for="lg in LEAGUES" :key="lg.id"><option :value="lg.id" x-text="lg.name"></option></template>
+    </select>
     <input type="date" x-model="sFrom" style="width:auto">
     <input type="date" x-model="sTo" style="width:auto">
-    <input type="text" x-model="sSearch" placeholder="Поиск по названию..." style="flex:1;min-width:140px">
-    <button @click="sType='';sFrom='';sTo='';sSearch=''" class="btn-ghost" style="padding:8px 14px">
-      <i class="fas fa-times mr-1"></i>Сброс
-    </button>
+    <input type="text" x-model="sSearch" placeholder="Поиск..." style="flex:1;min-width:120px">
+    <button @click="sType='';sFrom='';sTo='';sSearch='';sLeague=''" class="btn-ghost" style="padding:8px 14px"><i class="fas fa-times mr-1"></i>Сброс</button>
   </div>
-
   <div x-show="filteredSessions.length===0" class="text-center py-16" style="color:#4b5563">
     <i class="fas fa-inbox" style="font-size:36px;margin-bottom:12px;display:block"></i>
     <p style="font-size:14px">Нет записей</p>
   </div>
-
   <div x-show="filteredSessions.length>0" class="card overflow-x-auto">
     <table class="w-full">
       <thead class="tbl-head"><tr>
         <th @click="toggleSort('date')" class="cursor-pointer hover:text-slate-300 select-none">Дата</th>
-        <th>Тип</th>
-        <th style="text-align:left">Турнир</th>
-        <th>Взнос</th>
-        <th>Вхождений</th>
-        <th>Призы</th>
+        <th>Тип</th><th style="text-align:left">Турнир</th><th>Лига</th>
+        <th>Взнос</th><th>Вх.</th><th>Приз</th>
         <th @click="toggleSort('profit')" class="cursor-pointer hover:text-slate-300 select-none">Профит</th>
-        <th>Место</th>
-        <th></th>
+        <th>Место</th><th></th>
       </tr></thead>
       <tbody>
         <template x-for="s in filteredSessions" :key="s.id">
@@ -491,15 +471,22 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
             <td style="color:#9ca3af;white-space:nowrap" x-text="fmtDate(s.date)"></td>
             <td><span class="badge" :class="typeBadge(s.type)" x-text="s.type"></span></td>
             <td style="text-align:left;max-width:200px"><span class="block truncate" x-text="s.tournamentName||s.stakes||'—'" :title="s.tournamentName"></span></td>
+            <td>
+              <template x-if="s.leagueId">
+                <span class="badge" :style="`background:${leagueById(s.leagueId)?.color+'22'};color:${leagueById(s.leagueId)?.color}`"
+                      x-text="leagueById(s.leagueId)?.short||''"></span>
+              </template>
+              <template x-if="!s.leagueId"><span style="color:#374151">—</span></template>
+            </td>
             <td x-text="fmt(s.buyIn)"></td>
             <td style="color:#6b7280" x-text="s.entries>1?s.entries+'×':'1×'"></td>
             <td x-text="s.prize>0?fmt(s.prize):'—'"></td>
             <td :class="s.profit>=0?'pos font-bold':'neg font-bold'" x-text="(s.profit>=0?'+':'')+fmt(s.profit)"></td>
-            <td style="color:#6b7280" x-text="s.place||(s.place===0?'—':'—')"></td>
+            <td style="color:#6b7280" x-text="s.place||'—'"></td>
             <td>
-              <button @click="deleteSession(s.id)" style="color:#374151;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;transition:all .2s"
+              <button @click="deleteSession(s.id)" style="color:#374151;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px"
                       onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#374151'">
-                <i class="fas fa-trash" style="font-size:12px"></i>
+                <i class="fas fa-trash" style="font-size:11px"></i>
               </button>
             </td>
           </tr>
@@ -507,7 +494,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       </tbody>
       <tfoot>
         <tr class="tbl-row" style="border-top:2px solid rgba(255,255,255,0.1)">
-          <td colspan="3" style="font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase">Итого</td>
+          <td colspan="4" style="font-weight:700;color:#6b7280;font-size:11px;text-transform:uppercase">Итого</td>
           <td x-text="fmt(filteredSessions.reduce((a,s)=>a+s.buyIn,0))"></td>
           <td></td>
           <td x-text="fmt(filteredSessions.reduce((a,s)=>a+s.prize,0))"></td>
@@ -522,9 +509,9 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 
 </main>
 
-<!-- ═══ ADD MODAL ═══ -->
+<!-- MODAL -->
 <div x-show="showModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
-  <div class="absolute inset-0" style="background:rgba(0,0,0,.7);backdrop-filter:blur(4px)" @click="showModal=false"></div>
+  <div class="absolute inset-0" style="background:rgba(0,0,0,.75);backdrop-filter:blur(4px)" @click="showModal=false"></div>
   <div class="card p-6 w-full relative z-10" style="max-width:420px">
     <div class="flex items-center justify-between mb-5">
       <h3 style="font-size:15px;font-weight:700;color:white">Добавить сессию</h3>
@@ -535,22 +522,24 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <div class="grid grid-cols-2 gap-3">
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Тип</label>
           <select x-model="ns.type"><option>MTT</option><option>SNG</option><option>Cash</option><option>Windfall</option></select></div>
-        <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Название</label>
-          <input type="text" x-model="ns.tournamentName" placeholder="Название турнира..."></div>
+        <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Лига</label>
+          <select x-model="ns.leagueId">
+            <option value="">— нет —</option>
+            <template x-for="lg in LEAGUES" :key="lg.id"><option :value="lg.id" x-text="lg.short+' – '+lg.name"></option></template>
+          </select></div>
       </div>
+      <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Название турнира</label>
+        <input type="text" x-model="ns.tournamentName" placeholder="Название..."></div>
       <div class="grid grid-cols-2 gap-3">
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Взнос ₽</label><input type="number" x-model.number="ns.buyInPerEntry" min="0"></div>
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Вхождений</label><input type="number" x-model.number="ns.entries" min="1"></div>
       </div>
-      <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Призовые ₽</label><input type="number" x-model.number="ns.prize" min="0"></div>
       <div class="grid grid-cols-2 gap-3">
+        <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Призовые ₽</label><input type="number" x-model.number="ns.prize" min="0"></div>
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Место</label><input type="number" x-model.number="ns.place" min="0"></div>
-        <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:4px">Игроков</label><input type="number" x-model.number="ns.totalPlayers" min="0"></div>
       </div>
       <div style="background:#0a0a18;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12px;color:#6b7280">Итого взнос:</span>
-        <span style="font-size:13px;font-weight:700;color:#9ca3af" x-text="fmt((ns.buyInPerEntry||0)*(ns.entries||1))"></span>
-        <span style="font-size:12px;color:#6b7280;margin-left:16px">Профит:</span>
+        <span style="font-size:12px;color:#6b7280">Итого взнос: <strong style="color:#9ca3af" x-text="fmt((ns.buyInPerEntry||0)*(ns.entries||1))"></strong></span>
         <span style="font-size:13px;font-weight:700" :class="((ns.prize||0)-(ns.buyInPerEntry||0)*(ns.entries||1))>=0?'pos':'neg'"
               x-text="(((ns.prize||0)-(ns.buyInPerEntry||0)*(ns.entries||1))>=0?'+':'')+fmt((ns.prize||0)-(ns.buyInPerEntry||0)*(ns.entries||1))"></span>
       </div>
@@ -563,281 +552,285 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 </div>
 
 <script>
-const LEAGUE_KEYWORDS = ['рейтинг','еженедельн','ежедневн','серия','series','mpds','лига','league','чемпионат','кубок'];
-const WINDFALL_KEYWORDS = ['windfall','spin','спин','джекпот'];
-const RANGES = [
-  {label:'0–100',min:0,max:100},
-  {label:'101–500',min:101,max:500},
-  {label:'501–1000',min:501,max:1000},
-  {label:'1001–2500',min:1001,max:2500},
-  {label:'2501–5000',min:2501,max:5000},
-  {label:'5000+',min:5001,max:Infinity},
+// ─── Лиги ПокерДом (с полными списками турниров) ───
+const LEAGUES = [
+  {
+    id: 'podpolnye',
+    name: 'Лига Подпольных Боев',
+    short: 'ЛПБ',
+    prize: 100000,
+    color: '#ef4444',
+    icon: 'fas fa-skull-crossbones',
+    tournaments: [
+      { name: 'Фрэнки "4 Пальца"',           guarantee: 25000  },
+      { name: 'План Турецкого',                guarantee: 30000  },
+      { name: 'Свиноферма "Кирпича"',          guarantee: 30000  },
+      { name: 'Нокаут "Цыгана" Микки',         guarantee: 150000 },
+      { name: 'Везение Бориса "Бритвы"',       guarantee: 40000  },
+      { name: 'Большой Куш',                   guarantee: 250000 },
+      { name: 'Тони "Пуля в Зубах"',           guarantee: 50000  },
+    ]
+  },
+  {
+    id: 'boytsovskaya',
+    name: 'Бойцовская Лига',
+    short: 'БЛ',
+    prize: 250000,
+    color: '#f59e0b',
+    icon: 'fas fa-hand-fist',
+    tournaments: [
+      { name: 'Нокаут Рассказчика',            guarantee: 100000 },
+      { name: 'Первое Правило ПКО',             guarantee: 250000 },
+      { name: 'ПКО Проект "Разгром"',           guarantee: 200000 },
+      { name: 'Нокаут Тайлера Дёрдена',         guarantee: 300000 },
+      { name: 'Нокаут Марлы Сингер',            guarantee: 200000 },
+    ]
+  },
+  {
+    id: 'zvezdnaya',
+    name: 'Звездная Лига',
+    short: 'ЗЛ',
+    prize: 149800,
+    color: '#818cf8',
+    icon: 'fas fa-star',
+    tournaments: [
+      { name: 'Возвращение Джедая',             guarantee: 250000 },
+      { name: 'Скрытая Угроза',                 guarantee: 200000 },
+      { name: 'Атака Клонов',                   guarantee: 250000 },
+      { name: 'Месть Ситхов',                   guarantee: 175000 },
+      { name: 'Пробуждение Силы',               guarantee: 200000 },
+      { name: 'Последние Джедаи',               guarantee: 200000 },
+      { name: 'Новая Надежда',                  guarantee: 900000 },
+    ]
+  },
+  {
+    id: 'rybnaya',
+    name: 'Рыбная Лига',
+    short: 'РЛ',
+    prize: 150000,
+    color: '#06b6d4',
+    icon: 'fas fa-fish',
+    tournaments: [
+      { name: 'Полосатый Окунь',                guarantee: 70000  },
+      { name: 'Озорная Щука',                   guarantee: 75000  },
+      { name: 'Сумрачный Карп',                 guarantee: 90000  },
+      { name: 'Застенчивый Амур',               guarantee: 50000  },
+      { name: 'Дикий Карась',                   guarantee: 75000  },
+      { name: 'Одноглазый Лосось',              guarantee: 75000  },
+      { name: 'Радужная Форель',                guarantee: 120000 },
+    ]
+  },
 ];
+
+function detectLeague(name) {
+  if (!name) return null;
+  const l = name.toLowerCase();
+  for (const lg of LEAGUES) {
+    for (const t of lg.tournaments) {
+      // Match by significant keywords from tournament name
+      const keywords = t.name.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3);
+      if (keywords.some(k => l.includes(k))) return lg;
+    }
+  }
+  return null;
+}
 
 function detectType(name='') {
   const l = name.toLowerCase();
-  if (WINDFALL_KEYWORDS.some(k=>l.includes(k))) return 'Windfall';
+  if (/windfall|spin|спин|джекпот/.test(l)) return 'Windfall';
   if (/сит.?н.?го|sit.?n.?go|sng/.test(l)) return 'SNG';
   return 'MTT';
 }
-function isLeague(name='') { return LEAGUE_KEYWORDS.some(k=>name.toLowerCase().includes(k)); }
+
 function rx(s) { return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 function numRu(s) { return parseFloat((s||'0').replace(/\s+/g,'').replace(',','.')); }
 
+const RANGES = [
+  {label:'0–100',min:0,max:100},{label:'101–500',min:101,max:500},
+  {label:'501–1000',min:501,max:1000},{label:'1001–2500',min:1001,max:2500},
+  {label:'2501–5000',min:2501,max:5000},{label:'5000+',min:5001,max:Infinity},
+];
+
 function app() {
   return {
+    LEAGUES,
     page: 'stats',
     sessions: [],
 
-    // Stats filters
     statsTab: 'all',
-    dateFrom: '', dateTo: '', preset: 'all',
-    activeFrom: '', activeTo: '',
-    searchQuery: '',
+    dateFrom:'', dateTo:'', preset:'all',
+    activeFrom:'', activeTo:'',
+    searchQuery:'',
 
-    // Calendar
     calYear: new Date().getFullYear(),
     calMonth: new Date().getMonth(),
 
-    // Sessions page filters
-    sType: '', sFrom: '', sTo: '', sSearch: '',
-    sortField: 'date', sortDir: 'desc',
+    sType:'', sFrom:'', sTo:'', sSearch:'', sLeague:'',
+    sortField:'date', sortDir:'desc',
 
-    // Import
-    importText: '', importDate: '', importError: '', importSuccess: '', importing: false,
+    importText:'', importDate:'', importError:'', importSuccess:'', importing:false,
 
-    // Modal
-    showModal: false,
-    ns: {},
+    showModal:false,
+    ns:{},
 
-    // Chart
+    selectedLeague: null,
     chartInst: null,
 
     init() {
       this.loadData();
-      this.$watch('sessions', () => this.saveData());
-      this.$watch('page', () => {
-        this.$nextTick(() => { if (this.page==='stats') this.renderChart(); });
-      });
-      this.$nextTick(() => { if (this.sessions.length>0) this.renderChart(); });
+      this.$watch('sessions', ()=>this.saveData());
+      this.$watch('page', ()=>{ this.$nextTick(()=>{ if(this.page==='stats') this.renderChart(); }); });
+      this.$nextTick(()=>{ if(this.sessions.length>0) this.renderChart(); });
     },
 
-    // ── Presets ──
     setPreset(p) {
-      this.preset = p;
-      const now = new Date();
-      const iso = d => d.toISOString().slice(0,10);
-      if (p==='day')   { this.dateFrom = iso(now); this.dateTo = iso(now); }
-      else if (p==='week') { const d=new Date(now-6*86400000); this.dateFrom=iso(d); this.dateTo=iso(now); }
-      else if (p==='month') { const d=new Date(now.getFullYear(),now.getMonth(),1); this.dateFrom=iso(d); this.dateTo=iso(now); }
-      else if (p==='year') { this.dateFrom=now.getFullYear()+'-01-01'; this.dateTo=iso(now); }
-      else { this.dateFrom=''; this.dateTo=''; }
+      this.preset=p;
+      const now=new Date(), iso=d=>d.toISOString().slice(0,10);
+      if(p==='day'){this.dateFrom=iso(now);this.dateTo=iso(now);}
+      else if(p==='week'){this.dateFrom=iso(new Date(now-6*86400000));this.dateTo=iso(now);}
+      else if(p==='month'){this.dateFrom=iso(new Date(now.getFullYear(),now.getMonth(),1));this.dateTo=iso(now);}
+      else if(p==='year'){this.dateFrom=now.getFullYear()+'-01-01';this.dateTo=iso(now);}
+      else{this.dateFrom='';this.dateTo='';}
     },
-    applyFilter() {
-      this.activeFrom = this.dateFrom;
-      this.activeTo = this.dateTo;
-      this.$nextTick(() => this.renderChart());
-    },
+    applyFilter() { this.activeFrom=this.dateFrom; this.activeTo=this.dateTo; this.$nextTick(()=>this.renderChart()); },
 
-    // ── Computed: Stats ──
+    // ── Stats computed ──
     get statSessions() {
-      let s = [...this.sessions];
-      const tab = this.statsTab;
-      if (tab==='mtt') s = s.filter(r=>r.type==='MTT'||r.type==='SNG');
-      else if (tab==='cash') s = s.filter(r=>r.type==='Cash');
-      else if (tab==='windfall') s = s.filter(r=>r.type==='Windfall');
-      if (this.activeFrom) s = s.filter(r=>r.date>=this.activeFrom);
-      if (this.activeTo)   s = s.filter(r=>r.date<=this.activeTo);
-      if (this.searchQuery) {
-        const q = this.searchQuery.toLowerCase();
-        s = s.filter(r=>(r.tournamentName||'').toLowerCase().includes(q)||(r.stakes||'').toLowerCase().includes(q));
-      }
+      let s=[...this.sessions];
+      if(this.statsTab==='mtt') s=s.filter(r=>r.type==='MTT'||r.type==='SNG');
+      else if(this.statsTab==='cash') s=s.filter(r=>r.type==='Cash');
+      else if(this.statsTab==='windfall') s=s.filter(r=>r.type==='Windfall');
+      if(this.activeFrom) s=s.filter(r=>r.date>=this.activeFrom);
+      if(this.activeTo)   s=s.filter(r=>r.date<=this.activeTo);
+      if(this.searchQuery){ const q=this.searchQuery.toLowerCase(); s=s.filter(r=>(r.tournamentName||'').toLowerCase().includes(q)); }
       return s;
     },
-    get totalProfit() { return this.statSessions.reduce((a,s)=>a+s.profit,0); },
-    get roi() {
-      const inv = this.statSessions.reduce((a,s)=>a+s.buyIn,0);
-      return inv ? (this.totalProfit/inv)*100 : 0;
-    },
-    get itmPct() {
-      const t = this.statSessions;
-      return t.length ? (t.filter(s=>s.prize>0).length/t.length)*100 : 0;
-    },
-    get avgBuyIn() {
-      const t = this.statSessions;
-      return t.length ? t.reduce((a,s)=>a+s.buyIn,0)/t.length : 0;
-    },
-    get totalRebuys() { return this.statSessions.reduce((a,s)=>a+(s.rebuys||0),0); },
+    get totalProfit(){ return this.statSessions.reduce((a,s)=>a+s.profit,0); },
+    get roi(){ const inv=this.statSessions.reduce((a,s)=>a+s.buyIn,0); return inv?(this.totalProfit/inv)*100:0; },
+    get itmPct(){ const t=this.statSessions; return t.length?(t.filter(s=>s.prize>0).length/t.length)*100:0; },
+    get avgBuyIn(){ const t=this.statSessions; return t.length?t.reduce((a,s)=>a+s.buyIn,0)/t.length:0; },
+    get totalRebuys(){ return this.statSessions.reduce((a,s)=>a+(s.rebuys||0),0); },
     get stakeRanges() {
-      return RANGES.map(r => {
-        const ss = this.statSessions.filter(s => {
-          const b = s.buyInPerEntry || s.buyIn;
-          return b >= r.min && b <= r.max;
-        });
-        if (!ss.length) return null;
-        const count = ss.length;
-        const totalInitial = ss.reduce((a,s)=>a+s.buyInPerEntry,0);
-        const totalRebuys  = ss.reduce((a,s)=>a+(s.rebuys||0),0);
-        const totalInvested= ss.reduce((a,s)=>a+s.buyIn,0);
-        const totalPrize   = ss.reduce((a,s)=>a+s.prize,0);
-        const profit       = ss.reduce((a,s)=>a+s.profit,0);
-        const itm = ss.filter(s=>s.prize>0).length;
-        return {
-          label: r.label, count, totalInitial, totalRebuys, totalInvested, totalPrize, profit,
-          roi: totalInvested ? (profit/totalInvested)*100 : 0,
-          itm: (itm/count)*100,
-          top9Pct: (ss.filter(s=>s.place>0&&s.place<=9).length/count)*100,
-          top3Pct: (ss.filter(s=>s.place>0&&s.place<=3).length/count)*100,
-          firstPct:(ss.filter(s=>s.place===1).length/count)*100,
-        };
+      return RANGES.map(r=>{
+        const ss=this.statSessions.filter(s=>{ const b=s.buyInPerEntry||s.buyIn; return b>=r.min&&b<=r.max; });
+        if(!ss.length) return null;
+        const count=ss.length,totalInitial=ss.reduce((a,s)=>a+s.buyInPerEntry,0),
+              totalRebuys=ss.reduce((a,s)=>a+(s.rebuys||0),0),totalInvested=ss.reduce((a,s)=>a+s.buyIn,0),
+              totalPrize=ss.reduce((a,s)=>a+s.prize,0),profit=ss.reduce((a,s)=>a+s.profit,0),
+              itm=ss.filter(s=>s.prize>0).length;
+        return { label:r.label,count,totalInitial,totalRebuys,totalInvested,totalPrize,profit,
+          roi:totalInvested?(profit/totalInvested)*100:0,itm:(itm/count)*100,
+          top9Pct:(ss.filter(s=>s.place>0&&s.place<=9).length/count)*100,
+          top3Pct:(ss.filter(s=>s.place>0&&s.place<=3).length/count)*100,
+          firstPct:(ss.filter(s=>s.place===1).length/count)*100 };
       }).filter(Boolean);
     },
 
-    // ── Computed: Calendar ──
+    // ── Calendar computed ──
     get calendarCells() {
-      const y=this.calYear, m=this.calMonth;
-      const first = new Date(y,m,1);
-      const last  = new Date(y,m+1,0).getDate();
-      let dow = first.getDay(); if(dow===0) dow=7; dow--; // Mon=0
-
-      const dayMap = {};
-      const mk = `${y}-${String(m+1).padStart(2,'0')}`;
-      for (const s of this.sessions) {
-        if (!s.date.startsWith(mk)) continue;
-        const d = parseInt(s.date.slice(8));
-        if (!dayMap[d]) dayMap[d]={profit:0,count:0};
-        dayMap[d].profit += s.profit;
-        dayMap[d].count  += 1;
+      const y=this.calYear,m=this.calMonth;
+      const first=new Date(y,m,1),last=new Date(y,m+1,0).getDate();
+      let dow=first.getDay(); if(dow===0)dow=7; dow--;
+      const mk=`${y}-${String(m+1).padStart(2,'0')}`;
+      const dayMap={};
+      for(const s of this.sessions){
+        if(!s.date.startsWith(mk))continue;
+        const d=parseInt(s.date.slice(8));
+        if(!dayMap[d])dayMap[d]={profit:0,count:0};
+        dayMap[d].profit+=s.profit; dayMap[d].count+=1;
       }
-
-      const cells = [];
-      for (let i=0;i<dow;i++) cells.push({key:'e'+i,empty:true});
-      for (let d=1;d<=last;d++) {
-        const info = dayMap[d];
-        cells.push({key:'d'+d, empty:false, day:d,
-          profit: info ? info.profit : null,
-          count:  info ? info.count  : 0,
-        });
-      }
+      const cells=[];
+      for(let i=0;i<dow;i++) cells.push({key:'e'+i,empty:true});
+      for(let d=1;d<=last;d++) cells.push({key:'d'+d,empty:false,day:d,profit:dayMap[d]?dayMap[d].profit:null,count:dayMap[d]?dayMap[d].count:0});
       return cells;
     },
     get calStats() {
-      const y=this.calYear, m=this.calMonth;
-      const mk=`${y}-${String(m+1).padStart(2,'0')}`;
-      const ss = this.sessions.filter(s=>s.date.startsWith(mk));
-      if (!ss.length) return {total:0,mtt:0,cash:0,avgBuyIn:0,best:null,worst:null};
-
-      // Group by day
+      const y=this.calYear,m=this.calMonth,mk=`${y}-${String(m+1).padStart(2,'0')}`;
+      const ss=this.sessions.filter(s=>s.date.startsWith(mk));
+      if(!ss.length) return{total:0,mtt:0,cash:0,avgBuyIn:0,best:null,worst:null};
       const byDay={};
+      const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
       for(const s of ss){
         const d=s.date.slice(8);
-        if(!byDay[d]){byDay[d]={profit:0,label:d+' '+['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][m]};}
+        if(!byDay[d])byDay[d]={profit:0,dayLabel:parseInt(d)+' '+mo[m]};
         byDay[d].profit+=s.profit;
       }
       const days=Object.values(byDay);
-      const best  = days.reduce((b,d)=>d.profit>b.profit?d:b, {profit:-Infinity});
-      const worst = days.reduce((b,d)=>d.profit<b.profit?d:b, {profit:Infinity});
-
-      return {
-        total: ss.reduce((a,s)=>a+s.profit,0),
-        mtt:   ss.filter(s=>s.type!=='Cash').reduce((a,s)=>a+s.profit,0),
-        cash:  ss.filter(s=>s.type==='Cash').reduce((a,s)=>a+s.profit,0),
-        avgBuyIn: ss.reduce((a,s)=>a+s.buyIn,0)/ss.length,
-        best:  best.profit>-Infinity ? {profit:best.profit, dayLabel:best.label} : null,
-        worst: worst.profit<Infinity  ? {profit:worst.profit,dayLabel:worst.label} : null,
+      const best=days.reduce((b,d)=>d.profit>b.profit?d:b,{profit:-Infinity});
+      const worst=days.reduce((b,d)=>d.profit<b.profit?d:b,{profit:Infinity});
+      return{
+        total:ss.reduce((a,s)=>a+s.profit,0),mtt:ss.filter(s=>s.type!=='Cash').reduce((a,s)=>a+s.profit,0),
+        cash:ss.filter(s=>s.type==='Cash').reduce((a,s)=>a+s.profit,0),
+        avgBuyIn:ss.reduce((a,s)=>a+s.buyIn,0)/ss.length,
+        best:best.profit>-Infinity?best:null,worst:worst.profit<Infinity?worst:null,
       };
     },
-    calPrevMonth() { if(this.calMonth===0){this.calMonth=11;this.calYear--;}else this.calMonth--; },
-    calNextMonth() { if(this.calMonth===11){this.calMonth=0;this.calYear++;}else this.calMonth++; },
-    calMonthName() {
-      const mo=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
-      return mo[this.calMonth]+' '+this.calYear;
+    calPrevMonth(){if(this.calMonth===0){this.calMonth=11;this.calYear--;}else this.calMonth--;},
+    calNextMonth(){if(this.calMonth===11){this.calMonth=0;this.calYear++;}else this.calMonth++;},
+    calMonthName(){const mo=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];return mo[this.calMonth]+' '+this.calYear;},
+
+    // ── Leagues ──
+    leagueById(id){ return LEAGUES.find(l=>l.id===id)||null; },
+    leagueStats(id){
+      const ss=this.sessions.filter(s=>s.leagueId===id);
+      const inv=ss.reduce((a,s)=>a+s.buyIn,0);
+      const profit=ss.reduce((a,s)=>a+s.profit,0);
+      return{count:ss.length,profit,roi:inv?(profit/inv)*100:0};
+    },
+    leagueSessionsFor(id){ return[...this.sessions].filter(s=>s.leagueId===id).sort((a,b)=>b.date.localeCompare(a.date)); },
+    hasPlayedTournament(tName){
+      const k=tName.toLowerCase().replace(/[«»"']/g,'');
+      return this.sessions.some(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k.split(' ').filter(w=>w.length>3)[0]||k));
+    },
+    getTournamentProfit(tName){
+      const k=tName.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3)[0]||tName.toLowerCase();
+      return this.sessions.filter(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k)).reduce((a,s)=>a+s.profit,0);
+    },
+    getTournamentCount(tName){
+      const k=tName.toLowerCase().replace(/[«»"']/g,'').split(' ').filter(w=>w.length>3)[0]||tName.toLowerCase();
+      return this.sessions.filter(s=>(s.tournamentName||'').toLowerCase().replace(/[«»"']/g,'').includes(k)).length;
     },
 
-    // ── Computed: Leagues ──
-    get leagueSessions() {
-      return [...this.sessions].filter(s=>s.isLeague).sort((a,b)=>b.date.localeCompare(a.date));
-    },
-    get leagueTotal() { return this.leagueSessions.reduce((a,s)=>a+s.profit,0); },
-    get leagueRoi() {
-      const inv=this.leagueSessions.reduce((a,s)=>a+s.buyIn,0);
-      return inv?(this.leagueTotal/inv)*100:0;
-    },
-    get leagueItm() {
-      const t=this.leagueSessions;
-      return t.length?(t.filter(s=>s.prize>0).length/t.length)*100:0;
-    },
-    get leagueWeekly() {
-      const map={};
-      for(const s of this.leagueSessions) {
-        const d=new Date(s.date);
-        const day=d.getDay()||7;
-        const mon=new Date(d); mon.setDate(d.getDate()-day+1);
-        const sun=new Date(mon); sun.setDate(mon.getDate()+6);
-        const key=mon.toISOString().slice(0,10);
-        const label=fmtDateStr(mon)+' – '+fmtDateStr(sun);
-        if(!map[key]) map[key]={key,label,count:0,buyIn:0,prize:0,profit:0,itm:0};
-        map[key].count++;map[key].buyIn+=s.buyIn;map[key].prize+=s.prize;map[key].profit+=s.profit;
-        if(s.prize>0) map[key].itm++;
-      }
-      return Object.values(map).sort((a,b)=>b.key.localeCompare(a.key)).map(w=>({
-        ...w,
-        roi: w.buyIn?(w.profit/w.buyIn)*100:0,
-        itm: w.count?(w.itm/w.count)*100:0,
-      }));
-    },
-
-    // ── Computed: Sessions page ──
+    // ── Sessions page ──
     get filteredSessions() {
       let s=[...this.sessions];
       if(this.sType) s=s.filter(r=>r.type===this.sType);
+      if(this.sLeague) s=s.filter(r=>r.leagueId===this.sLeague);
       if(this.sFrom) s=s.filter(r=>r.date>=this.sFrom);
       if(this.sTo)   s=s.filter(r=>r.date<=this.sTo);
-      if(this.sSearch){
-        const q=this.sSearch.toLowerCase();
-        s=s.filter(r=>(r.tournamentName||'').toLowerCase().includes(q)||(r.stakes||'').toLowerCase().includes(q));
-      }
-      const f=this.sortField,d=this.sortDir;
-      s.sort((a,b)=>{
-        const va=a[f],vb=b[f];
-        const cmp=typeof va==='string'?va.localeCompare(vb):va-vb;
-        return d==='asc'?cmp:-cmp;
-      });
+      if(this.sSearch){const q=this.sSearch.toLowerCase();s=s.filter(r=>(r.tournamentName||'').toLowerCase().includes(q)||(r.stakes||'').toLowerCase().includes(q));}
+      s.sort((a,b)=>{const va=a[this.sortField],vb=b[this.sortField];const c=typeof va==='string'?va.localeCompare(vb):va-vb;return this.sortDir==='asc'?c:-c;});
       return s;
     },
 
     // ── Import ──
-    runImport() {
+    runImport(){
       this.importError='';this.importSuccess='';this.importing=true;
       setTimeout(()=>{
-        try {
-          const parsed = /Вхождение\s*#\d/i.test(this.importText)||/Начало\t+Турнир/i.test(this.importText)
-            ? this.parsePokerDomList(this.importText)
-            : this.parseHandHistory(this.importText);
-          if(!parsed.length) {
+        try{
+          const parsed=/Вхождение\s*#\d/i.test(this.importText)||/Начало\t+Турнир/i.test(this.importText)
+            ?this.parsePokerDomList(this.importText):this.parseHandHistory(this.importText);
+          if(!parsed.length){
             this.importError='Записи не найдены. Убедитесь, что скопирована история турниров ПокерДом.';
           } else {
             let added=0;
             for(const s of parsed){
               const key=[s.tournamentName||'',s.buyIn,s.place,s.prize,s.date].join('|');
-              const dup=this.sessions.some(e=>e._key===key);
-              if(!dup){s._key=key;this.sessions.push(s);added++;}
+              if(!this.sessions.some(e=>e._key===key)){s._key=key;this.sessions.push(s);added++;}
             }
             this.importSuccess=`Добавлено ${added} записей (${parsed.length-added} дубликатов пропущено).`;
             if(added>0){this.importText='';setTimeout(()=>{this.page='stats';this.$nextTick(()=>this.renderChart());},1800);}
           }
-        } catch(e){ this.importError='Ошибка: '+e.message; }
+        }catch(e){this.importError='Ошибка: '+e.message;}
         this.importing=false;
       },80);
     },
 
-    parsePokerDomList(text) {
+    parsePokerDomList(text){
       const raw=[];
       const lines=text.split('\n').map(l=>l.trimEnd());
       let i=0;
-      // Skip headers
       while(i<lines.length&&(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())||lines[i].trim()===''))i++;
-
       while(i<lines.length){
         while(i<lines.length&&lines[i].trim()==='')i++;
         if(i>=lines.length)break;
@@ -846,7 +839,6 @@ function app() {
         if(i>=lines.length||!lines[i].includes('\t')){if(i<lines.length)i++;continue;}
         const statsLine=lines[i];i++;
         if(block.length<2)continue;
-
         let name='',buyInPerEntry=0,entryNum=1,date=null;
         for(const l of block){
           const t=l.trim();
@@ -859,7 +851,6 @@ function app() {
           if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold)/i.test(t))continue;
           if(t.length>3)name=t;
         }
-
         const parts=statsLine.split('\t');
         let paidTotal=buyInPerEntry,place=0,prize=0;
         const pm0=parts[0]?parts[0].match(/(\d[\d\s]*(?:[.,]\d+)?)\s*р\./):null;
@@ -867,52 +858,40 @@ function app() {
         if(parts[1])place=parseInt(parts[1].trim())||0;
         const pm2=parts[2]?parts[2].match(/(\d[\d\s]*(?:[.,]\d+)?)\s*р\./):null;
         if(pm2)prize=numRu(pm2[1]);
-
         if(!date)date=this.importDate||new Date().toISOString().slice(0,10);
-
         raw.push({name,buyInPerEntry,entryNum,paidTotal,place,prize,date});
       }
-
-      // Merge re-entries: same name + same date
+      // Merge re-entries
       const merged={};
       for(const r of raw){
         const key=r.name+'|'+r.date;
-        if(!merged[key]){
-          merged[key]={
-            name:r.name, date:r.date, buyInPerEntry:r.buyInPerEntry,
-            totalPaid:0, maxEntryNum:0, bestPrize:0, bestPlace:0,
-          };
-        }
+        if(!merged[key]) merged[key]={name:r.name,date:r.date,buyInPerEntry:r.buyInPerEntry,totalPaid:0,maxEntryNum:0,bestPrize:0,bestPlace:0};
         const m=merged[key];
         m.totalPaid+=r.paidTotal;
         if(r.entryNum>m.maxEntryNum)m.maxEntryNum=r.entryNum;
         if(r.prize>m.bestPrize){m.bestPrize=r.prize;m.bestPlace=r.place;}
-        else if(r.place>0&&(m.bestPlace===0||r.place<m.bestPlace)&&r.prize===0&&m.bestPrize===0)m.bestPlace=r.place;
+        else if(r.place>0&&m.bestPlace===0&&r.prize===0)m.bestPlace=r.place;
       }
-
       return Object.values(merged).map(m=>{
         const entries=m.maxEntryNum||1;
         const buyIn=m.totalPaid||m.buyInPerEntry*entries;
         const rebuys=buyIn-m.buyInPerEntry;
         const type=detectType(m.name);
-        return {
+        const league=detectLeague(m.name);
+        return{
           id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-          date:m.date,type,
-          tournamentName:m.name,
+          date:m.date,type,tournamentName:m.name,
           stakes:m.buyInPerEntry?`${m.buyInPerEntry} ₽`:'',
-          buyInPerEntry:m.buyInPerEntry,
-          entries,rebuys,buyIn,
-          prize:m.bestPrize,
-          profit:m.bestPrize-buyIn,
-          place:m.bestPlace,
+          buyInPerEntry:m.buyInPerEntry,entries,rebuys,buyIn,
+          prize:m.bestPrize,profit:m.bestPrize-buyIn,place:m.bestPlace,
           totalPlayers:0,
-          isLeague:isLeague(m.name),
+          isLeague:!!league,leagueId:league?league.id:'',leagueName:league?league.name:'',
           source:'import',
         };
       });
     },
 
-    parseHandHistory(text) {
+    parseHandHistory(text){
       const sessions={};
       const nick=(text.match(/Dealt to ([^\s\[]+)/)||[])[1]||'';
       const hands=text.split(/(?=(?:Poker Hand|PokerStars Hand|Hand|Раздача)\s*#\d)/i);
@@ -927,7 +906,7 @@ function app() {
             const bim=hand.match(/[\$€₽]?\s*(\d+(?:[.,]\d+)?)\s*\+\s*[\$€₽]?\s*(\d+(?:[.,]\d+)?)/);
             const bi=bim?numRu(bim[1])+numRu(bim[2]):0;
             sessions[tid]={id:`t${tid}`,date,type:'MTT',tournamentName:'',stakes:bim?`${bim[1]}+${bim[2]}`:'',
-              buyInPerEntry:bi,entries:1,rebuys:0,buyIn:bi,prize:0,profit:-bi,place:0,totalPlayers:0,isLeague:false,source:'import'};
+              buyInPerEntry:bi,entries:1,rebuys:0,buyIn:bi,prize:0,profit:-bi,place:0,totalPlayers:0,isLeague:false,leagueId:'',source:'import'};
           }
           if(nick){
             const re=new RegExp(rx(nick)+'\\s+collected\\s+(\\d+(?:[.,]\\d+)?)','gi');let m;
@@ -936,33 +915,25 @@ function app() {
         }
       }
       const out=Object.values(sessions);
-      for(const s of out){s.profit=s.prize-s.buyIn;s.isLeague=isLeague(s.tournamentName);}
+      for(const s of out){s.profit=s.prize-s.buyIn;const lg=detectLeague(s.tournamentName);s.isLeague=!!lg;s.leagueId=lg?lg.id:'';}
       return out;
     },
 
     // ── Modal ──
     openAddModal(){
-      this.ns={date:new Date().toISOString().slice(0,10),type:'MTT',tournamentName:'',stakes:'',
-        buyInPerEntry:0,entries:1,prize:0,place:0,totalPlayers:0};
+      this.ns={date:new Date().toISOString().slice(0,10),type:'MTT',tournamentName:'',stakes:'',leagueId:'',buyInPerEntry:0,entries:1,prize:0,place:0};
       this.showModal=true;
     },
     addManual(){
       const buyIn=(this.ns.buyInPerEntry||0)*(this.ns.entries||1);
-      this.sessions.push({
-        ...this.ns,
-        id:Date.now().toString(),
-        buyIn,rebuys:buyIn-(this.ns.buyInPerEntry||0),
-        profit:(this.ns.prize||0)-buyIn,
-        isLeague:isLeague(this.ns.tournamentName||''),
-        source:'manual',_key:Date.now().toString(),
-      });
+      const lg=this.ns.leagueId?LEAGUES.find(l=>l.id===this.ns.leagueId):detectLeague(this.ns.tournamentName||'');
+      this.sessions.push({...this.ns,id:Date.now().toString(),buyIn,rebuys:buyIn-(this.ns.buyInPerEntry||0),
+        profit:(this.ns.prize||0)-buyIn,isLeague:!!lg,leagueId:lg?lg.id:this.ns.leagueId,leagueName:lg?lg.name:'',
+        source:'manual',_key:Date.now().toString()});
       this.showModal=false;
     },
     deleteSession(id){this.sessions=this.sessions.filter(s=>s.id!==id);},
-    toggleSort(f){
-      this.sortDir=this.sortField===f?(this.sortDir==='asc'?'desc':'asc'):'desc';
-      this.sortField=f;
-    },
+    toggleSort(f){this.sortDir=this.sortField===f?(this.sortDir==='asc'?'desc':'asc'):'desc';this.sortField=f;},
 
     // ── Chart ──
     renderChart(){
@@ -979,24 +950,19 @@ function app() {
       grad.addColorStop(1,'rgba(0,200,150,0)');
       this.chartInst=new Chart(canvas,{
         type:'line',
-        data:{
-          labels,
-          datasets:[
-            {data:vals,borderColor:'#00c896',backgroundColor:grad,fill:true,tension:0.3,
-             pointRadius:vals.length<50?2:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
-            {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.5)',
-             borderDash:[6,4],borderWidth:1,pointRadius:0,label:'0',fill:false},
-          ]
-        },
+        data:{labels,datasets:[
+          {data:vals,borderColor:'#00c896',backgroundColor:grad,fill:true,tension:0.3,
+           pointRadius:vals.length<50?2:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
+          {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.5)',
+           borderDash:[6,4],borderWidth:1.5,pointRadius:0,label:'0',fill:false},
+        ]},
         options:{
           responsive:true,maintainAspectRatio:false,
           interaction:{intersect:false,mode:'index'},
-          plugins:{
-            legend:{display:false},
+          plugins:{legend:{display:false},
             tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,
               titleColor:'#6b7280',bodyColor:'#e2e8f0',
-              callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'+':'')+this.fmt(c.raw)):''}},
-          },
+              callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'+':'')+this.fmt(c.raw)):''}}},
           scales:{
             x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10},
                title:{display:true,text:'Количество турниров',color:'#374151',font:{size:11}}},
@@ -1007,45 +973,14 @@ function app() {
     },
 
     // ── Helpers ──
-    fmt(v){
-      if(v==null)return'0 ₽';
-      const a=Math.abs(v),sg=v<0?'-':'';
-      if(a>=1000000)return sg+(a/1000000).toFixed(2)+'М ₽';
-      if(a>=1000)   return sg+(a/1000).toFixed(1)+'К ₽';
-      return sg+a.toFixed(0)+' ₽';
-    },
-    fmtK(v){
-      if(v==null)return'0';
-      const a=Math.abs(v),sg=v<0?'-':'';
-      if(a>=1000000)return sg+(a/1000000).toFixed(1)+'М';
-      if(a>=1000)   return sg+(a/1000).toFixed(0)+'К';
-      return sg+a.toFixed(0);
-    },
-    fmtDate(d){
-      if(!d)return'';
-      const[y,m,day]=d.split('-');
-      const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-      return`${+day} ${mo[+m-1]} ${y}`;
-    },
-    typeBadge(t){
-      if(t==='MTT')return'badge-mtt';if(t==='SNG')return'badge-sng';
-      if(t==='Cash')return'badge-cash';if(t==='Windfall')return'badge-wf';
-      return'badge-mtt';
-    },
+    fmt(v){if(v==null)return'0 ₽';const a=Math.abs(v),sg=v<0?'-':'';if(a>=1000000)return sg+(a/1000000).toFixed(2)+'М ₽';if(a>=1000)return sg+(a/1000).toFixed(1)+'К ₽';return sg+a.toFixed(0)+' ₽';},
+    fmtK(v){if(v==null)return'0';const a=Math.abs(v),sg=v<0?'-':'';if(a>=1000000)return sg+(a/1000000).toFixed(1)+'М';if(a>=1000)return sg+(a/1000).toFixed(0)+'К';return sg+a.toFixed(0);},
+    fmtDate(d){if(!d)return'';const[y,m,day]=d.split('-');const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];return`${+day} ${mo[+m-1]} ${y}`;},
+    typeBadge(t){if(t==='MTT')return'badge-mtt';if(t==='SNG')return'badge-sng';if(t==='Cash')return'badge-cash';if(t==='Windfall')return'badge-wf';return'badge-mtt';},
 
-    saveData(){
-      localStorage.setItem('pdstats2_sessions',JSON.stringify(this.sessions));
-    },
-    loadData(){
-      const s=localStorage.getItem('pdstats2_sessions');
-      if(s)try{this.sessions=JSON.parse(s);}catch{}
-    },
+    saveData(){localStorage.setItem('pdstats2_sessions',JSON.stringify(this.sessions));},
+    loadData(){const s=localStorage.getItem('pdstats2_sessions');if(s)try{this.sessions=JSON.parse(s);}catch{}},
   };
-}
-
-function fmtDateStr(d){
-  const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-  return`${d.getDate()} ${mo[d.getMonth()]}`;
 }
 </script>
 </body>
