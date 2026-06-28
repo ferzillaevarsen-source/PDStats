@@ -977,9 +977,13 @@ function app() { return {
     inp.onchange=async e=>{
       const f=e.target.files[0];if(!f)return;
       try{
-        this.importText=await f.text();
+        const buf=await f.arrayBuffer();
+        let text;
+        try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf);}
+        catch{text=new TextDecoder('windows-1251').decode(buf);}
+        this.importText=text;
         this.page='import';
-        this.showToast('Файл загружен: '+f.name+' ('+this.importText.length.toLocaleString()+' симв.)');
+        this.showToast('Файл загружен: '+f.name+' ('+text.length.toLocaleString()+' симв.)');
       }catch{this.showToast('Не удалось прочитать файл','error');}
     };
     inp.click();
@@ -1042,10 +1046,10 @@ function app() { return {
         const t=l.trim();
         const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
         const em=t.match(/Вхождение\s*#(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
-        const am=t.match(/^(\d[\d\s]*(?:[.,]\d+)?)\s*р\.$/);if(am){buyInPerEntry=numRu(am[1]);continue;}
+        const am=t.match(/^(\d[\d\s]*(?:[.,]\d+)?)\s*[рpРP]\.$/);if(am){buyInPerEntry=numRu(am[1]);continue;}
         if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold)/i.test(t))continue;
-        // Keep full name including guarantee (e.g. "Супер Нокаут 30 000 р.") — guarantee IS part of the unique name
-        if(t.length>3)name=t;
+        // Tournament names always start with Cyrillic — guard against buy-in lines that slipped past am regex
+        if(t.length>3&&/^[а-яёА-ЯЁ]/.test(t))name=t;
       }
       const parts=statsLine.split('\t');
       let paidTotal=buyInPerEntry,place=0,prize=0;
