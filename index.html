@@ -517,18 +517,28 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
           <tbody>
             <template x-for="row in mx.rows" :key="row.name">
               <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
-                <td style="padding:8px 14px;font-size:12px;max-width:140px" :style="row.total>0?'color:#e2e8f0':'color:#374151'">
-                  <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="row.name"></div>
+                <td style="padding:8px 14px;font-size:12px;max-width:160px" :style="row.total>0?'color:#e2e8f0':'color:#374151'">
+                  <div class="flex items-center gap-1.5">
+                    <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" x-text="row.name"></span>
+                    <template x-if="row.schedule">
+                      <span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,0.06);color:#4b5563;flex-shrink:0"
+                            x-text="['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][row.dayOfWeek]||''"></span>
+                    </template>
+                  </div>
                 </td>
                 <template x-for="(cell,ci) in row.cells" :key="ci">
-                  <td style="padding:5px 4px;text-align:center">
+                  <td style="padding:5px 4px;text-align:center"
+                      :style="!cell.active?'background:rgba(0,0,0,0.25)':''">
                     <template x-if="cell.count>0">
                       <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;font-size:10px;font-weight:700"
                             :style="cell.profit>=0?'background:rgba(0,200,150,0.18);color:#00c896':'background:rgba(239,68,68,0.15);color:#ef4444'"
                             x-text="cell.count>1?cell.count+'×':'✓'"></span>
                     </template>
-                    <template x-if="cell.count===0">
+                    <template x-if="cell.count===0&&cell.active">
                       <span style="color:#1e2030;font-size:14px;font-weight:300">·</span>
+                    </template>
+                    <template x-if="cell.count===0&&!cell.active">
+                      <span style="color:#111118;font-size:12px">—</span>
                     </template>
                   </td>
                 </template>
@@ -819,11 +829,15 @@ const LEAGUES = [
       {name:'Новая Надежда',guarantee:900000},
     ]},
   { id:'rybnaya', name:'Рыбная Лига', short:'РЛ', prize:150000, color:'#06b6d4', icon:'fas fa-fish',
+    weeklySchedule:true,
     tournaments:[
-      {name:'Полосатый Окунь',guarantee:70000},{name:'Озорная Щука',guarantee:75000},
-      {name:'Сумрачный Карп',guarantee:90000},{name:'Застенчивый Амур',guarantee:50000},
-      {name:'Дикий Карась',guarantee:75000},{name:'Одноглазый Лосось',guarantee:75000},
-      {name:'Радужная Форель',guarantee:120000},
+      {name:'Полосатый Окунь',guarantee:70000,dayOfWeek:0},
+      {name:'Озорная Щука',guarantee:75000,dayOfWeek:1},
+      {name:'Сумрачный Карп',guarantee:90000,dayOfWeek:2},
+      {name:'Застенчивый Амур',guarantee:50000,dayOfWeek:3},
+      {name:'Дикий Карась',guarantee:75000,dayOfWeek:4},
+      {name:'Одноглазый Лосось',guarantee:75000,dayOfWeek:5},
+      {name:'Радужная Форель',guarantee:120000,dayOfWeek:6},
     ]},
 ];
 
@@ -1032,7 +1046,7 @@ function app() { return {
 
   leagueWeekMatrix(id){
     const{from,to}=this.weekBounds();
-    const lg=LEAGUES.find(l=>l.id===id);if(!lg)return{days:[],rows:[],dayTotals:[]};
+    const lg=LEAGUES.find(l=>l.id===id);if(!lg)return{days:[],rows:[],dayTotals:[],schedule:false};
     const ws=this.sessions.filter(s=>s.leagueId===id&&s.date>=from&&s.date<=to);
     const today=new Date().toISOString().slice(0,10);
     const monDate=new Date(from+'T12:00:00');
@@ -1040,19 +1054,22 @@ function app() { return {
     const days=dayNames.map((label,d)=>{
       const dt=new Date(monDate);dt.setDate(monDate.getDate()+d);
       const iso=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
-      return{label,date:iso,num:dt.getDate(),isToday:iso===today};
+      const isPast=iso<today;
+      return{label,date:iso,num:dt.getDate(),isToday:iso===today,isPast};
     });
+    const schedule=!!lg.weeklySchedule;
     const rows=lg.tournaments.map(t=>{
-      const cells=days.map(day=>{
-        const ss=ws.filter(s=>s.date===day.date&&leagueMatchName(t.name,s.tournamentName||''));
-        return{count:ss.length,profit:ss.reduce((a,s)=>a+s.profit,0)};
+      const cells=days.map((day,di)=>{
+        const active=!schedule||(t.dayOfWeek===di);
+        const ss=active?ws.filter(s=>s.date===day.date&&leagueMatchName(t.name,s.tournamentName||'')):[];
+        return{count:ss.length,profit:ss.reduce((a,s)=>a+s.profit,0),active};
       });
-      return{name:t.name,guarantee:t.guarantee,cells,
+      return{name:t.name,guarantee:t.guarantee,dayOfWeek:t.dayOfWeek,cells,schedule,
         total:cells.reduce((a,c)=>a+c.count,0),
         totalProfit:cells.reduce((a,c)=>a+c.profit,0)};
     });
-    const dayTotals=days.map((_,di)=>rows.reduce((a,r)=>a+r.cells[di].count,0));
-    return{days,rows,dayTotals};
+    const dayTotals=days.map((_,di)=>rows.reduce((a,r)=>a+(r.cells[di].active?r.cells[di].count:0),0));
+    return{days,rows,dayTotals,schedule};
   },
   selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),60);},
 
