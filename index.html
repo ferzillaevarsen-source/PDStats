@@ -724,7 +724,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 const LEAGUES = [
   { id:'podpolnye', name:'Лига Подпольных Боев', short:'ЛПБ', prize:100000, color:'#ef4444', icon:'fas fa-skull-crossbones',
     tournaments:[
-      {name:'Фрэнки "4 Пальца"',guarantee:25000},{name:'План Турецкого',guarantee:30000},
+      {name:'Френки "4 Пальца"',guarantee:25000},{name:'План Турецкого',guarantee:30000},
       {name:'Свиноферма "Кирпича"',guarantee:30000},{name:'Нокаут "Цыгана" Микки',guarantee:150000},
       {name:'Везение Бориса "Бритвы"',guarantee:40000},{name:'Большой Куш',guarantee:250000},
       {name:'Тони "Пуля в Зубах"',guarantee:50000},
@@ -752,10 +752,13 @@ const LEAGUES = [
 ];
 
 function leagueMatchName(tName, inputName) {
-  const norm=s=>s.toLowerCase().replace(/[«»“”‘’"']/g,'').replace(/\s+/g,' ').trim();
+  const norm=s=>s.toLowerCase()
+    .replace(/[«»””’’”’]/g,’’)
+    .replace(/ё/g,’е’).replace(/э/g,’е’)
+    .replace(/\s+/g,’ ‘).trim();
   const clean=norm(tName);
   const input=norm(inputName);
-  const sig=clean.split(' ').filter(w=>w.length>4);
+  const sig=clean.split(‘ ‘).filter(w=>w.length>3);
   if(sig.length>=2) return sig.every(w=>input.includes(w));
   return input.includes(clean);
 }
@@ -1027,56 +1030,58 @@ function app() { return {
     },80);
   },
   parsePokerDomList(text){
-    const raw=[];
-    const lines=text.split('\n').map(l=>l.trimEnd());
+    // Determine base date from header or user input
     let globalDate=this.importDate||new Date().toISOString().slice(0,10);
-    // Extract date from file header (first 8 lines)
-    for(let j=0;j<Math.min(8,lines.length);j++){const hd=lines[j].trim().match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/);if(hd){globalDate=`${hd[3]}-${hd[2]}-${hd[1]}`;break;}}
-    // Extract first number from a string (encoding-safe)
+    const hLines=text.split('\n').slice(0,10);
+    for(const l of hLines){const m=l.trim().match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/);if(m){globalDate=`${m[3]}-${m[2]}-${m[1]}`;break;}}
+
     const numIn=s=>{const m=s&&s.match(/(\d[\d\s]*(?:[.,]\d+)?)/);return m?numRu(m[1]):0;};
-    let i=0;
-    // Skip global header lines
-    while(i<lines.length&&(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/.test(lines[i].trim())||/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())||lines[i].trim()===''))i++;
-    while(i<lines.length){
-      while(i<lines.length&&lines[i].trim()==='')i++;
-      if(i>=lines.length)break;
-      if(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())){i++;continue;}
-      const block=[];
-      while(i<lines.length&&lines[i].trim()!==''&&!lines[i].includes('\t')){block.push(lines[i]);i++;}
-      if(i>=lines.length||!lines[i].includes('\t')){if(i<lines.length)i++;continue;}
-      const statsLine=lines[i];i++;
-      if(block.length<2)continue;
+    const normN=s=>s.toLowerCase().replace(/[«»""''"']/g,'').replace(/ё/g,'е').replace(/э/g,'е').replace(/\s+/g,' ').trim();
+
+    // Split entire text into chunks separated by blank lines
+    const chunks=text.replace(/\r/g,'').split(/\n[ \t]*\n+/).map(c=>c.trim()).filter(Boolean);
+    const raw=[];
+
+    for(const chunk of chunks){
+      const cLines=chunk.split('\n').map(l=>l.trim());
+      // Find the tab-separated stats line
+      const si=cLines.findIndex(l=>l.includes('\t'));
+      if(si<0)continue; // no stats line — header/section chunk, skip
+      const header=cLines.slice(0,si);
+      const statsLine=cLines[si];
+      if(!header.length)continue;
+
       let name='',buyIn=0,entryNum=1,date=globalDate;
-      for(const l of block){
-        const t=l.trim();if(!t)continue;
-        // Date override
+      for(const t of header){
+        if(!t)continue;
+        // Date line (dd.mm.yyyy)
         const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
-        // Re-entry number (Вхождение #N or Прохождение #N)
+        // Re-entry: "Вхождение №2", "Вхождение #2", "Вхождение 2", "Прохождение №2"
         const em=t.match(/(?:Вхождение|Прохождение)[^0-9]*(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
-        // Game type line
-        if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL)/i.test(t))continue;
-        // Buy-in: line starting with digit — strip non-numeric chars (robust against encoding)
+        // Game type (skip)
+        if(/^(Холдем|Омаха|Стад|НЛ|БЛ|ПЛ|Hold|Omaha|Texas|NL|PL|Другое)/i.test(t))continue;
+        // Pure number line = buy-in (strip any non-numeric suffix like "р.")
         if(/^\d/.test(t)){buyIn=numRu(t.replace(/[^\d,. ]/g,'').trim());continue;}
-        // Tournament name: must start with Cyrillic letter
-        if(t.length>3&&/^[а-яёА-ЯЁ]/.test(t))name=t;
+        // Cyrillic-starting line = tournament name (last one wins)
+        if(t.length>2&&/^[а-яёА-ЯЁ]/i.test(t))name=t;
       }
       if(!name)continue;
+
       const parts=statsLine.split('\t');
       const paidTotal=numIn(parts[0])||buyIn;
       const place=parts[1]?parseInt(parts[1].trim())||0:0;
-      const prize=numIn(parts[2]);
+      const prize=parts[2]?numIn(parts[2]):0;
       raw.push({name,buyIn,entryNum,paidTotal,place,prize,date});
     }
-    // Sort by (date, name, entryNum asc) so #1 is always processed before #2
+
+    // Sort: date → name → entryNum so #1 always precedes #2, #3…
     raw.sort((a,b)=>{
       const dc=a.date.localeCompare(b.date);if(dc)return dc;
-      const nc=a.name.localeCompare(b.name);if(nc)return nc;
+      const nc=normN(a.name).localeCompare(normN(b.name));if(nc)return nc;
       return a.entryNum-b.entryNum;
     });
-    // Normalize name for comparison: strip all quote variants, collapse spaces
-    const normN=s=>s.toLowerCase().replace(/[«»""''"']/g,'').replace(/\s+/g,' ').trim();
-    // Merge re-entries: entryNum>1 attaches to the instance with maxEntryNum===entryNum-1
-    // entryNum===1 always creates a new instance (separate plays on the same day stay separate)
+
+    // Merge re-entries into single instances
     const instances=[];
     for(const r of raw){
       const target=r.entryNum>1
@@ -1087,10 +1092,11 @@ function app() { return {
         target.maxEntryNum=r.entryNum;
         if(r.prize>target.bestPrize){target.bestPrize=r.prize;target.bestPlace=r.place;}
         else if(r.place>0&&target.bestPlace===0)target.bestPlace=r.place;
-      } else {
+      }else{
         instances.push({name:r.name,date:r.date,buyIn:r.buyIn,totalPaid:r.paidTotal,maxEntryNum:r.entryNum||1,bestPrize:r.prize,bestPlace:r.place});
       }
     }
+
     return instances.map(m=>{
       const entries=m.maxEntryNum||1;
       const totalBuyIn=m.totalPaid||m.buyIn*entries;
