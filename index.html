@@ -419,7 +419,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
         </div>
         <div style="font-size:10px;color:#6b7280;margin-bottom:2px">Призовой фонд</div>
         <div style="font-size:15px;font-weight:800;margin-bottom:10px" :style="`color:${lg.color}`" x-text="fmt(lg.prize)"></div>
-        <div class="grid grid-cols-3 gap-1">
+        <div class="grid grid-cols-3 gap-1 mb-2">
           <div style="background:rgba(0,0,0,.3);border-radius:5px;padding:5px;text-align:center">
             <div style="font-size:9px;color:#6b7280">Тур.</div>
             <div style="font-size:13px;font-weight:700;color:#e2e8f0" x-text="leagueStats(lg.id).count"></div>
@@ -434,6 +434,18 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
             <div style="font-size:11px;font-weight:700" :class="leagueStats(lg.id).profit>=0?'pos':'neg'"
                  x-text="fmtK(leagueStats(lg.id).profit)"></div>
           </div>
+        </div>
+        <!-- Weekly progress -->
+        <div style="border-top:1px solid rgba(255,255,255,0.06);padding-top:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-size:9px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Эта неделя</span>
+            <span style="font-size:11px;font-weight:700" :style="`color:${lg.color}`"
+                  x-text="leagueWeekProgress(lg.id).played+' / '+leagueWeekProgress(lg.id).total"></span>
+          </div>
+          <div style="height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden">
+            <div :style="`width:${leagueWeekProgress(lg.id).total?Math.min(100,leagueWeekProgress(lg.id).played/leagueWeekProgress(lg.id).total*100):0}%;height:100%;background:${lg.color};border-radius:2px;transition:width .3s`"></div>
+          </div>
+          <div style="font-size:10px;color:#4b5563;margin-top:3px" x-text="leagueWeekProgress(lg.id).sessions+' игр | '+((leagueWeekProgress(lg.id).profit>=0?'+':'')+fmtK(leagueWeekProgress(lg.id).profit))"></div>
         </div>
       </div>
     </template>
@@ -475,6 +487,30 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
         <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:10px">Кривая профита в лиге</div>
         <div style="height:180px"><canvas id="leagueChart"></canvas></div>
       </div>
+      <!-- This week sessions -->
+      <template x-if="leagueWeekProgress(selectedLeague).sessions>0">
+        <div class="card p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <span style="font-size:12px;font-weight:600;color:#9ca3af">Эта неделя</span>
+            <div class="flex items-center gap-3">
+              <span style="font-size:12px;color:#6b7280" x-text="leagueWeekProgress(selectedLeague).sessions+' игр'"></span>
+              <span style="font-size:13px;font-weight:700" :class="leagueWeekProgress(selectedLeague).profit>=0?'pos':'neg'"
+                    x-text="(leagueWeekProgress(selectedLeague).profit>=0?'+':'')+fmt(leagueWeekProgress(selectedLeague).profit)"></span>
+            </div>
+          </div>
+          <!-- Progress by tournament type this week -->
+          <div class="grid lg:grid-cols-2 gap-2">
+            <template x-for="t in lg.tournaments" :key="t.name">
+              <div x-data="{get weekCount(){return sessions.filter(s=>s.leagueId===selectedLeague&&leagueMatchName(t.name,s.tournamentName||'')&&s.date>=weekBounds().from&&s.date<=weekBounds().to).length}}"
+                   class="flex items-center gap-2 p-2 rounded-lg"
+                   :style="weekCount>0?'background:rgba(0,200,150,0.06);border:1px solid rgba(0,200,150,0.15)':'background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)'">
+                <div :style="weekCount>0?'color:#00c896':'color:#374151'" style="font-size:11px;width:18px;text-align:center;font-weight:700" x-text="weekCount>0?weekCount+'×':'—'"></div>
+                <span style="font-size:12px" :style="weekCount>0?'color:#e2e8f0':'color:#4b5563'" x-text="t.name"></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
       <!-- League sessions -->
       <template x-if="leagueSessionsFor(selectedLeague).length>0">
         <div class="card overflow-x-auto">
@@ -557,7 +593,8 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <p style="font-size:12px;color:#4b5563;margin-top:1px" x-text="filteredSessions.length+' записей'"></p>
     </div>
     <div class="flex gap-2 flex-wrap justify-end">
-      <button class="btn-ghost" @click="exportData()" style="padding:7px 13px;font-size:12px"><i class="fas fa-download mr-1.5"></i>Экспорт JSON</button>
+      <button class="btn-ghost" @click="exportCSV()" style="padding:7px 13px;font-size:12px"><i class="fas fa-file-csv mr-1.5"></i>CSV</button>
+      <button class="btn-ghost" @click="exportData()" style="padding:7px 13px;font-size:12px"><i class="fas fa-download mr-1.5"></i>JSON</button>
       <button class="btn-ghost" @click="importFromJSON()" style="padding:7px 13px;font-size:12px"><i class="fas fa-file-import mr-1.5"></i>Импорт JSON</button>
       <button class="btn-danger" @click="showClearConfirm=true" style="padding:7px 13px;font-size:12px"><i class="fas fa-trash mr-1.5"></i>Очистить всё</button>
       <button class="btn-primary" @click="openAddModal()" style="padding:7px 13px;font-size:12px"><i class="fas fa-plus mr-1.5"></i>Добавить</button>
@@ -835,6 +872,12 @@ function app() { return {
     const m=Math.floor(v.length/2);
     return v.length%2?v[m]:(v[m-1]+v[m])/2;
   },
+  get reentryStats(){
+    const ss=this.statSessions,w=ss.filter(s=>s.entries>1);
+    return{rate:ss.length?(w.length/ss.length)*100:0,count:w.length,
+      avgE:w.length?w.reduce((a,s)=>a+s.entries,0)/w.length:0,
+      spend:ss.reduce((a,s)=>a+(s.rebuys||0),0)};
+  },
   get stakeRanges(){
     return RANGES.map(r=>{
       const ss=this.statSessions.filter(s=>{const b=s.buyInPerEntry||s.buyIn;return b>=r.min&&b<=r.max;});
@@ -933,6 +976,20 @@ function app() { return {
   hasPlayedTournament(tName){return this.sessions.some(s=>leagueMatchName(tName,s.tournamentName||''));},
   getTournamentProfit(tName){return this.sessions.filter(s=>leagueMatchName(tName,s.tournamentName||'')).reduce((a,s)=>a+s.profit,0);},
   getTournamentCount(tName){return this.sessions.filter(s=>leagueMatchName(tName,s.tournamentName||'')).length;},
+  weekBounds(){
+    const now=new Date(),day=now.getDay()||7,mon=new Date(now);
+    mon.setDate(now.getDate()-(day-1));
+    const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+    const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    return{from:iso(mon),to:iso(sun)};
+  },
+  leagueWeekProgress(id){
+    const{from,to}=this.weekBounds();
+    const lg=LEAGUES.find(l=>l.id===id);if(!lg)return{played:0,total:0,sessions:0,profit:0};
+    const ws=this.sessions.filter(s=>s.leagueId===id&&s.date>=from&&s.date<=to);
+    const played=new Set(ws.map(s=>{for(const t of lg.tournaments){if(leagueMatchName(t.name,s.tournamentName||''))return t.name;}return s.tournamentName;})).size;
+    return{played,total:lg.tournaments.length,sessions:ws.length,profit:ws.reduce((a,s)=>a+s.profit,0)};
+  },
   selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),60);},
 
   // ── Sessions ──
@@ -975,6 +1032,15 @@ function app() { return {
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pdstats_${new Date().toISOString().slice(0,10)}.json`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     this.showToast(`Экспортировано ${this.sessions.length} записей`);
+  },
+  exportCSV(){
+    const headers=['Дата','Турнир','Тип','Лига','Взнос','Вхождений','Реентри','Приз','Профит','Место'];
+    const rows=this.sessions.map(s=>[s.date,s.tournamentName||'',s.type||'',s.leagueName||'',s.buyIn,s.entries||1,s.rebuys||0,s.prize,s.profit,s.place||0]);
+    const csv=[headers,...rows].map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='pdstats_'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    this.showToast('CSV: '+this.sessions.length+' записей');
   },
   importFromTxt(){
     const inp=document.createElement('input');inp.type='file';inp.accept='.txt,.text,text/plain';
@@ -1037,12 +1103,16 @@ function app() { return {
     const numIn=s=>{const m=s&&s.match(/(\d[\d\s]*(?:[.,]\d+)?)/);return m?numRu(m[1]):0;};
     const normN=s=>s.toLowerCase().replace(/[\u00ab\u00bb\u201c\u201d\u2018\u2019"']/g,'').replace(/ё/g,'е').replace(/э/g,'е').replace(/\s+/g,' ').trim();
     let i=0;
+    let currentDate=globalDate;
     // Skip global header (date line, section headers, blank lines)
     while(i<lines.length&&(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/.test(lines[i].trim())||/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())||lines[i].trim()===''))i++;
     while(i<lines.length){
       // Skip blank lines between blocks
       while(i<lines.length&&lines[i].trim()==='')i++;
       if(i>=lines.length)break;
+      // Standalone date line between blocks → update currentDate
+      const _sd=lines[i].trim().match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})$/);
+      if(_sd){currentDate=`${_sd[3]}-${_sd[2]}-${_sd[1]}`;i++;continue;}
       // Skip standalone section headers inside data
       if(/^(Холдем|Омаха|Стад|Другое)$/i.test(lines[i].trim())||/^Начало/i.test(lines[i].trim())){i++;continue;}
       // Collect header lines until tab-line or blank line
@@ -1052,11 +1122,11 @@ function app() { return {
       if(i>=lines.length||!lines[i].includes('\t')){if(i<lines.length&&lines[i].trim()===''){}else if(i<lines.length)i++;continue;}
       const statsLine=lines[i];i++;
       if(!block.length)continue;
-      let name='',buyIn=0,entryNum=1,date=globalDate;
+      let name='',buyIn=0,entryNum=1,date=currentDate;
       for(const l of block){
         const t=l.trim();if(!t)continue;
         // Date line
-        const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
+        const dm=t.match(/^(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})/);if(dm){currentDate=date=`${dm[3]}-${dm[2]}-${dm[1]}`;continue;}
         // Re-entry (handles #2, №2, Вхождение 2, Прохождение №2)
         const em=t.match(/(?:Вхождение|Прохождение)[^0-9]*(\d+)/i);if(em){entryNum=parseInt(em[1]);continue;}
         // Game type (skip)
@@ -1066,6 +1136,7 @@ function app() { return {
         // Cyrillic-start = tournament name (last match wins)
         if(t.length>2&&/^[а-яёА-ЯЁ]/.test(t))name=t;
       }
+      name=name.replace(/\s+\d[\d\s]*р\.\s*$/i,'').trim();
       if(!name)continue;
       const parts=statsLine.split('\t');
       const paidTotal=numIn(parts[0])||buyIn;
