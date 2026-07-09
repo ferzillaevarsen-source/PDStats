@@ -601,6 +601,18 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
     <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:5px">Дата (если не определяется автоматически)</label>
     <input type="date" x-model="importDate" style="width:auto">
   </div>
+  <!-- pdhelper info -->
+  <div class="card p-3 mb-4 flex items-start gap-3" style="background:#0d1117;border-color:rgba(0,200,150,0.15)">
+    <i class="fas fa-robot" style="color:#00c896;margin-top:2px;flex-shrink:0"></i>
+    <div style="font-size:11px;line-height:1.6;color:#6b7280">
+      <span style="color:#9ca3af;font-weight:600">Авто-импорт:</span>
+      запустите <code style="background:#1a1a2e;padding:1px 5px;border-radius:4px;color:#a5b4fc">pdhelper.py</code>,
+      откройте историю турниров во вкладке <b style="color:#9ca3af">Турнир</b> в PokerDom,
+      нажмите <kbd style="background:#1a1a2e;padding:1px 6px;border-radius:4px;color:#fcd34d">F1</kbd>
+      — данные появятся здесь автоматически.
+      <br><span style="color:#374151">Установка: <code style="color:#a5b4fc">python -m pip install pywin32 keyboard pystray Pillow</code></span>
+    </div>
+  </div>
   <div class="card p-4 mb-4">
     <label style="font-size:12px;color:#6b7280;display:block;margin-bottom:5px">История турниров</label>
     <textarea x-model="importText" rows="12" style="font-family:monospace;font-size:11px;resize:vertical" placeholder="Вставьте историю..."></textarea>
@@ -611,6 +623,29 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
   </div>
   <div x-show="importError" class="mb-4 p-3 rounded-xl text-sm" style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);color:#fca5a5" x-text="importError"></div>
   <div x-show="importSuccess" class="mb-4 p-3 rounded-xl text-sm" style="background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);color:#6ee7b7" x-text="importSuccess"></div>
+  <!-- Auto-import status strip -->
+  <div class="mb-3 rounded-xl overflow-hidden" style="border:1px solid rgba(255,255,255,0.06)">
+    <div class="flex items-center gap-3 p-3" style="background:#0a0a1a">
+      <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .4s"
+           :style="autoImportStatus==='ready'||autoImportStatus==='importing'?'background:#00c896;box-shadow:0 0 6px #00c896':autoImportStatus==='badtoken'||autoImportStatus==='offline'?'background:#ef4444':'background:#374151'"></div>
+      <span style="font-size:11px;flex:1" :style="autoImportStatus==='badtoken'?'color:#ef4444':autoImportStatus==='ready'?'color:#00c896':'color:#6b7280'" x-text="
+        autoImportStatus==='notoken'?'Введите GitHub Token ниже для авто-импорта':
+        autoImportStatus==='badtoken'?'Токен недействителен — проверьте настройку':
+        autoImportStatus==='offline'?'Нет соединения с GitHub':
+        autoImportStatus==='empty'?'Подключено — нажмите F1 в окне PokerDom':
+        autoImportStatus==='ready'?'Подключено — нажмите F1 в окне PokerDom':
+        autoImportStatus==='importing'?'Импортируется...':
+        'Подключение...'
+      "></span>
+    </div>
+    <!-- Token input (shown only when no token) -->
+    <div x-show="autoImportStatus==='notoken'||autoImportStatus==='badtoken'" class="flex gap-2 p-2" style="background:#060610;border-top:1px solid rgba(255,255,255,0.04)">
+      <input x-ref="tokInput" type="password" placeholder="GitHub Token (ghp_...)" style="flex:1;font-size:11px;padding:6px 10px;background:#0f0f1e">
+      <button @click="saveGhToken($refs.tokInput.value)" style="flex-shrink:0;background:rgba(0,200,150,0.15);border:1px solid rgba(0,200,150,0.3);color:#00c896;padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+        Сохранить
+      </button>
+    </div>
+  </div>
   <div class="flex gap-3 flex-wrap">
     <button class="btn-primary flex-1" @click="runImport()" :disabled="!importText.trim()||importing">
       <i class="fas fa-upload mr-2"></i><span x-text="importing?'Обработка...':'Импортировать'"></span>
@@ -863,7 +898,7 @@ function app() { return {
   statsTab:'all', dateFrom:'', dateTo:'', preset:'all', activeFrom:'', activeTo:'', searchQuery:'', chartMode:'count',
   calYear:new Date().getFullYear(), calMonth:new Date().getMonth(),
   selectedLeague:null,
-  importText:'', importDate:'', importError:'', importSuccess:'', importing:false,
+  importText:'', importDate:'', importError:'', importSuccess:'', importing:false, autoImportStatus:'idle',
   sType:'', sFrom:'', sTo:'', sSearch:'', sLeague:'',
   sortField:'date', sortDir:'desc', sessionsPage:1, sessionsPageSize:25,
   showModal:false, editingId:null, ns:{},
@@ -872,6 +907,7 @@ function app() { return {
 
   init() {
     this.loadData();
+    setTimeout(()=>this.startPolling(), 1000);
     this.$watch('sessions',()=>this.saveData());
     this.$watch('page',p=>{this.$nextTick(()=>{
       if(p==='stats') this.renderChart();
@@ -1103,7 +1139,53 @@ function app() { return {
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     this.showToast(`Экспортировано ${this.sessions.length} записей`);
   },
-  exportCSV(){
+
+  _pollTimer:null, _lastSha:'', _ghToken:'',
+  _GH_REPO:'ferzillaevarsen-source/PDStats',
+  _GH_FILE:'pdimport.json',
+
+  startPolling(){
+    if(this._pollTimer)return;
+    this._ghToken=localStorage.getItem('pdstats_gh_token')||'';
+    this._pollTimer=setInterval(()=>this._poll(),5000);
+    this._poll();
+  },
+  stopPolling(){
+    if(this._pollTimer){clearInterval(this._pollTimer);this._pollTimer=null;}
+    this.autoImportStatus='idle';
+  },
+  saveGhToken(tok){
+    this._ghToken=tok.trim();
+    localStorage.setItem('pdstats_gh_token',this._ghToken);
+    if(this._ghToken){this.autoImportStatus='idle';this._poll();}
+  },
+  async _poll(){
+    if(!this._ghToken){this.autoImportStatus='notoken';return;}
+    const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/'+this._GH_FILE;
+    try{
+      const r=await Promise.race([
+        fetch(url,{headers:{Authorization:'token '+this._ghToken,Accept:'application/vnd.github.v3+json'}}),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),4000))
+      ]);
+      if(r.status===404){this.autoImportStatus='empty';return;}
+      if(r.status===401){this.autoImportStatus='badtoken';return;}
+      if(!r.ok){this.autoImportStatus='error';return;}
+      const meta=await r.json();
+      this.autoImportStatus='ready';
+      if(meta.sha&&meta.sha!==this._lastSha){
+        const d=JSON.parse(atob(meta.content.replace(/\n/g,'')));
+        if(d.text&&d.ts){
+          this._lastSha=meta.sha;
+          this.importText=d.text;
+          this.autoImportStatus='importing';
+          this.runImport();
+        }
+      }
+    }catch(e){
+      this.autoImportStatus='offline';
+    }
+  },
+    exportCSV(){
     const headers=['Дата','Турнир','Тип','Лига','Взнос','Вхождений','Реентри','Приз','Профит','Место'];
     const rows=this.sessions.map(s=>[s.date,s.tournamentName||'',s.type||'',s.leagueName||'',s.buyIn,s.entries||1,s.rebuys||0,s.prize,s.profit,s.place||0]);
     const csv=[headers,...rows].map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\n');
