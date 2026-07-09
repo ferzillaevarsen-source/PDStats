@@ -60,19 +60,24 @@ _local_data = None   # последние захваченные данные �
 LOCAL_PORT = 12345
 
 class _Handler(http.server.BaseHTTPRequestHandler):
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
     def do_GET(self):
         body = json.dumps(_local_data or {"status": "empty"}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._cors()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
     def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_response(204)
+        self._cors()
         self.end_headers()
-    def log_message(self, *_): pass  # не засорять лог
+    def log_message(self, *_): pass
 
 def _start_local_server():
     _sockserver.TCPServer.allow_reuse_address = True
