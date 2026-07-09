@@ -70,7 +70,7 @@ def gh_push(text: str) -> bool:
         "lines":  len([l for l in text.splitlines() if l.strip()]),
     }
     content_b64 = base64.b64encode(
-        json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        json.dumps(payload, ensure_ascii=True).encode("ascii")
     ).decode()
 
     body = {
@@ -107,57 +107,38 @@ def find_pokerdom():
 def capture():
     global _status
     _status = "capturing"
-    wins = find_pokerdom()
-    if not wins:
-        _status = "error"
-        notify("PDStats Helper", "Окно PokerDom не найдено. Откройте клиент.")
-        return
 
-    hwnd, _ = wins[0]
-    try:
-        if win32gui.IsIconic(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
-    except Exception:
-        pass
-    time.sleep(0.4)
-
-    # Запомним старый буфер
-    old = ""
-    try:
-        win32clipboard.OpenClipboard(); old = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT); win32clipboard.CloseClipboard()
-    except Exception:
-        try: win32clipboard.CloseClipboard()
-        except: pass
-
-    # Ctrl+A → Ctrl+C
-    try:
-        win32clipboard.OpenClipboard(); win32clipboard.EmptyClipboard(); win32clipboard.CloseClipboard()
-    except Exception:
-        try: win32clipboard.CloseClipboard()
-        except: pass
-
-    keyboard.send("ctrl+a"); time.sleep(0.15)
-    keyboard.send("ctrl+c"); time.sleep(0.35)
-
+    # Читаем что уже в буфере (пользователь сам сделал Ctrl+A, Ctrl+C в PokerDom)
     text = ""
     try:
-        win32clipboard.OpenClipboard(); text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT); win32clipboard.CloseClipboard()
+        win32clipboard.OpenClipboard()
+        try:
+            text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+        except Exception:
+            pass
+        win32clipboard.CloseClipboard()
     except Exception:
         try: win32clipboard.CloseClipboard()
         except: pass
 
-    if not text or text == old:
+    if not text or not text.strip():
         _status = "error"
-        notify("PDStats Helper", "Буфер пуст. Перейди на вкладку Турнир в PokerDom.")
+        notify("PDStats Helper", "Буфер пуст. Сначала выдели всё в PokerDom (Ctrl+A → Ctrl+C), затем F1.")
+        return
+
+    # Проверяем что это похоже на историю турниров
+    if "хождение" not in text and "Вхождение" not in text and "\t" not in text:
+        _status = "error"
+        notify("PDStats Helper", "В буфере не история турниров. Скопируй вкладку Турнир в PokerDom.")
         return
 
     _status = "pushing"
-    notify("PDStats Helper", f"Захвачено {len(text.splitlines())} строк — отправляю в GitHub...")
+    lines = len([l for l in text.splitlines() if l.strip()])
+    notify("PDStats Helper", f"{lines} строк — отправляю в GitHub...")
 
     if gh_push(text):
         _status = "ok"
-        notify("PDStats Helper", "Готово! Данные появятся в браузере автоматически.")
+        notify("PDStats Helper", "Готово! Данные появятся в браузере через 5 сек.")
     else:
         _status = "error"
 
