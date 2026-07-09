@@ -1173,13 +1173,17 @@ function app() { return {
       const meta=await r.json();
       this.autoImportStatus='ready';
       if(meta.sha&&meta.sha!==this._lastSha){
-        const d=JSON.parse(atob(meta.content.replace(/\n/g,'')));
-        if(d.text&&d.ts){
-          this._lastSha=meta.sha;
-          this.importText=d.text;
-          this.autoImportStatus='importing';
-          this.runImport();
-        }
+        this._lastSha=meta.sha;
+        try{
+          const raw=atob(meta.content.replace(/\n/g,''));
+          const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+          const d=JSON.parse(new TextDecoder('utf-8').decode(bytes));
+          if(d.text&&d.ts){
+            this.importText=d.text;
+            this.autoImportStatus='importing';
+            this.runImport();
+          }
+        }catch(e){this.autoImportStatus='error';}
       }
     }catch(e){
       this.autoImportStatus='offline';
