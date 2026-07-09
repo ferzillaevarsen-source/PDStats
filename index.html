@@ -1155,7 +1155,7 @@ function app() { return {
     if(this._pollTimer)return;
     this._ghToken=localStorage.getItem('pdstats_gh_token')||'';
     this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
-    this._pollTimer=setInterval(()=>this._poll(),5000);
+    this._pollTimer=setInterval(()=>this._poll(),2000);
     this._poll();
   },
   stopPolling(){
