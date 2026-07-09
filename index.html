@@ -1154,6 +1154,26 @@ function app() { return {
     if(this._pollTimer){clearInterval(this._pollTimer);this._pollTimer=null;}
     this.autoImportStatus='idle';
   },
+  _autoImportDirect(text){
+    try{
+      const isPokerDom=/(?:Вхождение|Прохождение)[^\n]*\d/i.test(text)||/Начало[\t ]+Турнир/i.test(text)||(text.includes('\t')&&/[а-яёА-ЯЁ]{4,}/i.test(text));
+      const parsed=isPokerDom?this.parsePokerDomList(text):this.parseHandHistory(text);
+      if(!parsed.length){this.autoImportStatus='error';this.showToast('Авто-импорт: записи не найдены','error');return;}
+      let added=0;
+      for(const s of parsed){
+        const key=[s.tournamentName||'',s.buyIn,s.place,s.prize,s.date].join('|');
+        if(!this.sessions.some(e=>e._key===key)){s._key=key;this.sessions.push(s);added++;}
+      }
+      this.autoImportStatus='ready';
+      if(added>0){this.showToast('⚡ Авто-импорт: +'+added+' турниров');this.$nextTick(()=>this.renderChart());}
+      else{this.showToast('Авто-импорт: все записи уже есть');}
+    }catch(e){
+      this.autoImportStatus='error';
+      this.showToast('Авто-импорт: ошибка','error');
+    }
+  },
+  saveGhToken(tok){
+  },
   saveGhToken(tok){
     this._ghToken=tok.trim();
     localStorage.setItem('pdstats_gh_token',this._ghToken);
@@ -1179,9 +1199,8 @@ function app() { return {
           const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
           const d=JSON.parse(new TextDecoder('utf-8').decode(bytes));
           if(d.text&&d.ts){
-            this.importText=d.text;
             this.autoImportStatus='importing';
-            this.runImport();
+            this._autoImportDirect(d.text);
           }
         }catch(e){this.autoImportStatus='error';}
       }
