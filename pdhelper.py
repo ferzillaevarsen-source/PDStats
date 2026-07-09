@@ -1,11 +1,11 @@
 """
 PDStats Helper — авто-импорт турнирной истории из PokerDom
-Ctrl+Shift+P → захват → push в GitHub → браузер подхватывает автоматически
+F1 → захват (Ctrl+A, Ctrl+C в PokerDom) → push в GitHub → браузер подхватывает
 """
 import sys, time, threading, json, ctypes, base64
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
-HOTKEY        = "ctrl+shift+p"  # можно изменить в pdhelper_config.json
+HOTKEY        = "f1"   # можно изменить в pdhelper_config.json ("hotkey")
 GITHUB_REPO   = "ferzillaevarsen-source/PDStats"
 GITHUB_BRANCH = "main"
 GITHUB_FILE   = "pdimport.json"
@@ -21,11 +21,11 @@ if not _cfg_path.exists():
         "PDStats Helper — первый запуск", 0x40)
 _cfg = json.loads(_cfg_path.read_text(encoding="utf-8"))
 GITHUB_TOKEN = _cfg.get("github_token", "")
-HOTKEY       = _cfg.get("hotkey", HOTKEY)  # override from config if set
+HOTKEY       = _cfg.get("hotkey", HOTKEY)
 
 # ── Зависимости ───────────────────────────────────────────────────────────────
 try:
-    import win32gui, win32con, win32clipboard, win32api
+    import win32gui, win32con, win32clipboard, win32api, win32process
     import keyboard
     import pystray
     import requests
@@ -46,10 +46,9 @@ _gh_headers = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept": "application/vnd.github.v3+json",
 }
-_file_sha = None  # SHA текущего pdimport.json (нужен для обновления)
+_file_sha = None
 
 def gh_get_sha():
-    """Получить текущий SHA файла (нужен для PUT)"""
     global _file_sha
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     try:
@@ -57,12 +56,11 @@ def gh_get_sha():
         if r.status_code == 200:
             _file_sha = r.json().get("sha")
         elif r.status_code == 404:
-            _file_sha = None  # файл ещё не создан
+            _file_sha = None
     except Exception:
         pass
 
 def gh_push(text: str) -> bool:
-    """Обновить pdimport.json в репозитории"""
     global _file_sha
     payload = {
         "ts":     time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -73,7 +71,6 @@ def gh_push(text: str) -> bool:
     content_b64 = base64.b64encode(
         json.dumps(payload, ensure_ascii=True).encode("ascii")
     ).decode()
-
     body = {
         "message": f"pdstats import {payload['ts']}",
         "content": content_b64,
@@ -81,7 +78,6 @@ def gh_push(text: str) -> bool:
     }
     if _file_sha:
         body["sha"] = _file_sha
-
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_FILE}"
     try:
         r = requests.put(url, headers=_gh_headers, json=body, timeout=15)
@@ -105,6 +101,40 @@ def find_pokerdom():
     win32gui.EnumWindows(cb, None)
     return result
 
+def force_to_foreground(hwnd):
+    """Надёжный вывод окна на передний план (обходит ограничение Windows на фоновые процессы)."""
+    try:
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+
+        # AttachThreadInput — единственный надёжный способ из фонового процесса
+        fg_hwnd = win32gui.GetForegroundWindow()
+        fg_tid, _ = win32process.GetWindowThreadProcessId(fg_hwnd)
+        our_tid  = win32api.GetCurrentThreadId()
+
+        attached = False
+        if fg_tid and fg_tid != our_tid:
+            try:
+                win32process.AttachThreadInput(our_tid, fg_tid, True)
+                attached = True
+            except Exception:
+                pass
+
+        win32gui.BringWindowToTop(hwnd)
+        win32gui.SetForegroundWindow(hwnd)
+        try:
+            win32gui.SetActiveWindow(hwnd)
+        except Exception:
+            pass
+
+        if attached:
+            try:
+                win32process.AttachThreadInput(our_tid, fg_tid, False)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
 def capture():
     global _status
     _status = "capturing"
@@ -117,30 +147,25 @@ def capture():
 
     hwnd, _ = wins[0]
 
-    # Активируем окно PokerDom
-    try:
-        if win32gui.IsIconic(hwnd):
-            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-        win32gui.SetForegroundWindow(hwnd)
-    except Exception:
-        pass
-    time.sleep(0.7)
+    # Надёжно выводим PokerDom на передний план
+    force_to_foreground(hwnd)
+    time.sleep(0.5)
 
-    # Кликаем в центр нижней части окна — это область таблицы турниров
+    # Кликаем в нижние 2/3 окна — область таблицы турниров
     try:
         rect = win32gui.GetWindowRect(hwnd)
         cx = (rect[0] + rect[2]) // 2
-        cy = rect[1] + (rect[3] - rect[1]) * 2 // 3  # 2/3 вниз (область таблицы)
+        cy = rect[1] + (rect[3] - rect[1]) * 2 // 3
         win32api.SetCursorPos((cx, cy))
-        time.sleep(0.15)
+        time.sleep(0.12)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         time.sleep(0.05)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-        time.sleep(0.3)
+        time.sleep(0.25)
     except Exception:
         pass
 
-    # Очищаем буфер перед копированием
+    # Очищаем буфер
     try:
         win32clipboard.OpenClipboard()
         win32clipboard.EmptyClipboard()
@@ -151,9 +176,9 @@ def capture():
 
     # Ctrl+A → Ctrl+C
     keyboard.send("ctrl+a")
-    time.sleep(0.35)
+    time.sleep(0.3)
     keyboard.send("ctrl+c")
-    time.sleep(0.7)
+    time.sleep(0.6)
 
     # Читаем результат
     text = ""
@@ -170,7 +195,7 @@ def capture():
 
     if not text or not text.strip():
         _status = "error"
-        notify("PDStats Helper", "Буфер пуст. Открой вкладку Турнир в PokerDom и попробуй снова.")
+        notify("PDStats Helper", "Буфер пуст. Открой вкладку ТУРНИР в PokerDom и попробуй снова.")
         return
 
     _status = "pushing"
@@ -214,6 +239,7 @@ def run_tray():
 
 # ── Запуск ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    gh_get_sha()          # получаем SHA файла заранее
-    keyboard.add_hotkey(HOTKEY, on_hotkey)
-    run_tray()            # блокирующий вызов
+    gh_get_sha()
+    # suppress=True — клавиша не проходит в Windows (без снижения громкости!)
+    keyboard.add_hotkey(HOTKEY, on_hotkey, suppress=True)
+    run_tray()
