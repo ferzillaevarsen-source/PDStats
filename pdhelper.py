@@ -159,122 +159,54 @@ def force_to_foreground(hwnd):
     except Exception as e:
         log.error(f"force_to_foreground exception: {e}\n{traceback.format_exc()}")
 
-def capture():
-    global _status
-    _status = "capturing"
-    log.info("─── capture() вызван ───")
-
-    wins = find_pokerdom()
-    log.info(f"find_pokerdom: найдено окон = {len(wins)}")
-    for hwnd, title in wins:
-        log.info(f"  hwnd={hwnd}, title={title!r}")
-
-    if not wins:
-        _status = "error"
-        log.error("PokerDom не найден")
-        notify("PDStats Helper", "Окно PokerDom не найдено. Откройте клиент.")
-        return
-
-    hwnd, title = wins[0]
-    log.info(f"Используем окно: {title!r} hwnd={hwnd}")
-
-    # Надёжно выводим PokerDom на передний план
-    force_to_foreground(hwnd)
-    time.sleep(0.5)
-
-    # Кликаем в нижние 2/3 окна — область таблицы турниров
-    try:
-        rect = win32gui.GetWindowRect(hwnd)
-        cx = (rect[0] + rect[2]) // 2
-        cy = rect[1] + (rect[3] - rect[1]) * 2 // 3
-        log.debug(f"Окно rect={rect}, клик в ({cx}, {cy})")
-        win32api.SetCursorPos((cx, cy))
-        time.sleep(0.12)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-        time.sleep(0.05)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-        time.sleep(0.25)
-        log.debug("Клик по окну: OK")
-    except Exception as e:
-        log.error(f"Клик по окну failed: {e}\n{traceback.format_exc()}")
-
-    # Очищаем буфер
-    try:
-        win32clipboard.OpenClipboard()
-        win32clipboard.EmptyClipboard()
-        win32clipboard.CloseClipboard()
-        log.debug("Буфер очищен")
-    except Exception as e:
-        log.warning(f"Очистка буфера: {e}")
-        try: win32clipboard.CloseClipboard()
-        except: pass
-
-    # Ctrl+A → Ctrl+C
-    log.debug("Отправляю Ctrl+A...")
-    keyboard.send("ctrl+a")
-    time.sleep(0.3)
-    log.debug("Отправляю Ctrl+C...")
-    keyboard.send("ctrl+c")
-    time.sleep(0.6)
-    log.debug("Ctrl+A, Ctrl+C отправлены")
-
-    # Читаем результат — перебираем все доступные форматы
+def read_clipboard() -> str:
+    """Читает текст из буфера обмена, пробует Unicode и ANSI."""
     text = ""
     try:
         win32clipboard.OpenClipboard()
-
-        # Перечисляем все форматы в буфере
         fmt_list = []
         fmt = win32clipboard.EnumClipboardFormats(0)
         while fmt:
-            try:
-                fname = win32clipboard.GetClipboardFormatName(fmt)
-            except Exception:
-                fname = f"#{fmt}"
+            try: fname = win32clipboard.GetClipboardFormatName(fmt)
+            except: fname = f"#{fmt}"
             fmt_list.append(f"{fmt}={fname}")
             fmt = win32clipboard.EnumClipboardFormats(fmt)
         log.info(f"Форматы в буфере: {fmt_list}")
-
-        # Пробуем CF_UNICODETEXT (13)
         try:
             text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
             log.info("Прочитан CF_UNICODETEXT")
         except Exception:
             pass
-
-        # Если не вышло — пробуем CF_TEXT (1, ANSI)
         if not text:
             try:
                 raw = win32clipboard.GetClipboardData(win32con.CF_TEXT)
                 text = raw.decode("cp1251", errors="replace") if isinstance(raw, bytes) else str(raw)
-                log.info("Прочитан CF_TEXT (cp1251)")
+                log.info("Прочитан CF_TEXT")
             except Exception as e:
                 log.warning(f"CF_TEXT failed: {e}")
-
-        # Если не вышло — пробуем HTML Format
-        if not text:
-            try:
-                html_fmt = win32clipboard.RegisterClipboardFormat("HTML Format")
-                raw = win32clipboard.GetClipboardData(html_fmt)
-                if isinstance(raw, bytes):
-                    raw = raw.decode("utf-8", errors="replace")
-                log.info(f"Прочитан HTML Format (первые 500): {raw[:500]!r}")
-                text = raw  # парсер разберётся или покажем в логе
-            except Exception as e:
-                log.warning(f"HTML Format failed: {e}")
-
         win32clipboard.CloseClipboard()
     except Exception as e:
         log.error(f"OpenClipboard failed: {e}")
         try: win32clipboard.CloseClipboard()
         except: pass
+    return text
 
-    log.info(f"Буфер обмена итог: длина={len(text)}, первые 300 симв.: {text[:300]!r}")
+
+def capture():
+    global _status
+    _status = "capturing"
+    log.info("─── capture() вызван ───")
+
+    # Читаем то, что пользователь уже скопировал в PokerDom (Ctrl+A, Ctrl+C)
+    text = read_clipboard()
+    log.info(f"Буфер: длина={len(text)}, первые 300 симв.: {text[:300]!r}")
 
     if not text or not text.strip():
         _status = "error"
-        log.error("Буфер пуст после Ctrl+A+C")
-        notify("PDStats Helper", "Буфер пуст. Открой вкладку ТУРНИР в PokerDom и попробуй снова.")
+        log.error("Буфер пуст")
+        notify("PDStats Helper",
+               "Буфер пуст!\n"
+               "В PokerDom: ТУРНИР → выдели всё → Ctrl+C → затем F1")
         return
 
     _status = "pushing"
@@ -310,7 +242,7 @@ def notify(title, msg):
 def run_tray():
     global _icon
     menu = pystray.Menu(
-        pystray.MenuItem(f"{HOTKEY.upper()} — захват из PokerDom", None, enabled=False),
+        pystray.MenuItem(f"PokerDom: Ctrl+A, Ctrl+C → {HOTKEY.upper()}", None, enabled=False),
         pystray.MenuItem(f"Репо: {GITHUB_REPO}", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Захватить сейчас", lambda i, _: on_hotkey()),
