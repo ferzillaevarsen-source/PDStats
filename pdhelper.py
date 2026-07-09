@@ -2,7 +2,7 @@
 PDStats Helper — авто-импорт турнирной истории из PokerDom
 F1 → захват (Ctrl+A, Ctrl+C в PokerDom) → push в GitHub → браузер подхватывает
 """
-import sys, time, threading, json, ctypes, base64
+import sys, time, threading, json, ctypes, base64, logging, traceback
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
 HOTKEY        = "f1"   # можно изменить в pdhelper_config.json ("hotkey")
@@ -10,8 +10,21 @@ GITHUB_REPO   = "ferzillaevarsen-source/PDStats"
 GITHUB_BRANCH = "main"
 GITHUB_FILE   = "pdimport.json"
 
-# Токен читается из pdhelper_config.json (не попадает в git)
+# ── Лог ───────────────────────────────────────────────────────────────────────
 import os as _os, pathlib as _pathlib
+
+_log_path = _pathlib.Path(__file__).parent / "pdhelper.log"
+logging.basicConfig(
+    filename=str(_log_path),
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    encoding="utf-8",
+)
+log = logging.getLogger("pdhelper")
+log.info("=" * 60)
+log.info("PDStats Helper запущен")
+
+# Токен читается из pdhelper_config.json (не попадает в git)
 _cfg_path = _pathlib.Path(__file__).parent / "pdhelper_config.json"
 if not _cfg_path.exists():
     _cfg_path.write_text('{"github_token": ""}', encoding="utf-8")
@@ -104,48 +117,66 @@ def find_pokerdom():
 def force_to_foreground(hwnd):
     """Надёжный вывод окна на передний план (обходит ограничение Windows на фоновые процессы)."""
     try:
-        if win32gui.IsIconic(hwnd):
+        iconic = win32gui.IsIconic(hwnd)
+        log.debug(f"force_to_foreground: hwnd={hwnd}, iconic={iconic}")
+        if iconic:
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+            log.debug("ShowWindow(SW_RESTORE) вызван")
 
-        # AttachThreadInput — единственный надёжный способ из фонового процесса
         fg_hwnd = win32gui.GetForegroundWindow()
         fg_tid, _ = win32process.GetWindowThreadProcessId(fg_hwnd)
         our_tid  = win32api.GetCurrentThreadId()
+        log.debug(f"fg_hwnd={fg_hwnd}, fg_tid={fg_tid}, our_tid={our_tid}")
 
         attached = False
         if fg_tid and fg_tid != our_tid:
             try:
                 win32process.AttachThreadInput(our_tid, fg_tid, True)
                 attached = True
-            except Exception:
-                pass
+                log.debug("AttachThreadInput: OK")
+            except Exception as e:
+                log.warning(f"AttachThreadInput failed: {e}")
 
         win32gui.BringWindowToTop(hwnd)
+        log.debug("BringWindowToTop: OK")
         win32gui.SetForegroundWindow(hwnd)
+        log.debug("SetForegroundWindow: OK")
         try:
             win32gui.SetActiveWindow(hwnd)
-        except Exception:
-            pass
+            log.debug("SetActiveWindow: OK")
+        except Exception as e:
+            log.warning(f"SetActiveWindow failed: {e}")
 
         if attached:
             try:
                 win32process.AttachThreadInput(our_tid, fg_tid, False)
-            except Exception:
-                pass
-    except Exception:
-        pass
+                log.debug("AttachThreadInput detach: OK")
+            except Exception as e:
+                log.warning(f"AttachThreadInput detach failed: {e}")
+
+        actual_fg = win32gui.GetForegroundWindow()
+        log.debug(f"Текущее foreground после переключения: {actual_fg} (целевое: {hwnd}, совпадает: {actual_fg==hwnd})")
+    except Exception as e:
+        log.error(f"force_to_foreground exception: {e}\n{traceback.format_exc()}")
 
 def capture():
     global _status
     _status = "capturing"
+    log.info("─── capture() вызван ───")
 
     wins = find_pokerdom()
+    log.info(f"find_pokerdom: найдено окон = {len(wins)}")
+    for hwnd, title in wins:
+        log.info(f"  hwnd={hwnd}, title={title!r}")
+
     if not wins:
         _status = "error"
+        log.error("PokerDom не найден")
         notify("PDStats Helper", "Окно PokerDom не найдено. Откройте клиент.")
         return
 
-    hwnd, _ = wins[0]
+    hwnd, title = wins[0]
+    log.info(f"Используем окно: {title!r} hwnd={hwnd}")
 
     # Надёжно выводим PokerDom на передний план
     force_to_foreground(hwnd)
@@ -156,29 +187,36 @@ def capture():
         rect = win32gui.GetWindowRect(hwnd)
         cx = (rect[0] + rect[2]) // 2
         cy = rect[1] + (rect[3] - rect[1]) * 2 // 3
+        log.debug(f"Окно rect={rect}, клик в ({cx}, {cy})")
         win32api.SetCursorPos((cx, cy))
         time.sleep(0.12)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
         time.sleep(0.05)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
         time.sleep(0.25)
-    except Exception:
-        pass
+        log.debug("Клик по окну: OK")
+    except Exception as e:
+        log.error(f"Клик по окну failed: {e}\n{traceback.format_exc()}")
 
     # Очищаем буфер
     try:
         win32clipboard.OpenClipboard()
         win32clipboard.EmptyClipboard()
         win32clipboard.CloseClipboard()
-    except Exception:
+        log.debug("Буфер очищен")
+    except Exception as e:
+        log.warning(f"Очистка буфера: {e}")
         try: win32clipboard.CloseClipboard()
         except: pass
 
     # Ctrl+A → Ctrl+C
+    log.debug("Отправляю Ctrl+A...")
     keyboard.send("ctrl+a")
     time.sleep(0.3)
+    log.debug("Отправляю Ctrl+C...")
     keyboard.send("ctrl+c")
     time.sleep(0.6)
+    log.debug("Ctrl+A, Ctrl+C отправлены")
 
     # Читаем результат
     text = ""
@@ -186,29 +224,37 @@ def capture():
         win32clipboard.OpenClipboard()
         try:
             text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning(f"GetClipboardData(CF_UNICODETEXT) failed: {e}")
         win32clipboard.CloseClipboard()
-    except Exception:
+    except Exception as e:
+        log.error(f"OpenClipboard failed: {e}")
         try: win32clipboard.CloseClipboard()
         except: pass
 
+    log.info(f"Буфер обмена: длина={len(text)}, первые 200 симв.: {text[:200]!r}")
+
     if not text or not text.strip():
         _status = "error"
+        log.error("Буфер пуст после Ctrl+A+C")
         notify("PDStats Helper", "Буфер пуст. Открой вкладку ТУРНИР в PokerDom и попробуй снова.")
         return
 
     _status = "pushing"
     lines = len([l for l in text.splitlines() if l.strip()])
+    log.info(f"Текст захвачен: {lines} строк, отправляю в GitHub...")
     notify("PDStats Helper", f"{lines} строк — отправляю в GitHub...")
 
     if gh_push(text):
         _status = "ok"
+        log.info("GitHub push: успех")
         notify("PDStats Helper", "Готово! Данные появятся в браузере через 5 сек.")
     else:
         _status = "error"
+        log.error("GitHub push: ошибка")
 
 def on_hotkey():
+    log.info(f"Хоткей {HOTKEY!r} нажат")
     threading.Thread(target=capture, daemon=True).start()
 
 # ── Трей ──────────────────────────────────────────────────────────────────────
@@ -239,7 +285,11 @@ def run_tray():
 
 # ── Запуск ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    log.info(f"Хоткей: {HOTKEY!r}, репо: {GITHUB_REPO}, файл: {GITHUB_FILE}")
+    log.info(f"Лог: {_log_path}")
     gh_get_sha()
+    log.info(f"Начальный SHA файла: {_file_sha!r}")
     # suppress=True — клавиша не проходит в Windows (без снижения громкости!)
     keyboard.add_hotkey(HOTKEY, on_hotkey, suppress=True)
+    log.info("Хоткей зарегистрирован, трей запускается...")
     run_tray()
