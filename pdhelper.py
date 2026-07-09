@@ -5,7 +5,7 @@ F1 → захват (Ctrl+A, Ctrl+C в PokerDom) → push в GitHub → брау
 import sys, time, threading, json, ctypes, base64, logging, traceback
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
-HOTKEY        = "f1"   # можно изменить в pdhelper_config.json ("hotkey")
+HOTKEY        = "f9"   # можно изменить в pdhelper_config.json ("hotkey")
 GITHUB_REPO   = "ferzillaevarsen-source/PDStats"
 GITHUB_BRANCH = "main"
 GITHUB_FILE   = "pdimport.json"
@@ -105,6 +105,23 @@ def gh_push(text: str) -> bool:
         return False
 
 # ── Захват PokerDom ───────────────────────────────────────────────────────────
+VK_CONTROL = 0x11
+VK_A       = 0x41
+VK_C       = 0x43
+
+def keydown(vk):
+    win32api.keybd_event(vk, 0, 0, 0)
+
+def keyup(vk):
+    win32api.keybd_event(vk, 0, win32con.KEYEVENTF_KEYUP, 0)
+
+def send_ctrl(vk):
+    """Отправляет Ctrl+vk через keybd_event (минует хук keyboard-библиотеки)."""
+    keydown(VK_CONTROL); keydown(vk)
+    time.sleep(0.06)
+    keyup(vk); keyup(VK_CONTROL)
+
+
 def find_pokerdom():
     result = []
     def cb(hwnd, _):
@@ -113,6 +130,22 @@ def find_pokerdom():
             result.append((hwnd, t))
     win32gui.EnumWindows(cb, None)
     return result
+
+def find_chrome_widget(parent):
+    """Ищет Chrome_RenderWidgetHostHWND внутри Electron-окна."""
+    found = []
+    def cb(hwnd, _):
+        try:
+            if win32gui.GetClassName(hwnd) == 'Chrome_RenderWidgetHostHWND':
+                found.append(hwnd)
+        except Exception:
+            pass
+        return True
+    try:
+        win32gui.EnumChildWindows(parent, cb, None)
+    except Exception:
+        pass
+    return found
 
 def force_to_foreground(hwnd):
     """Надёжный вывод окна на передний план (обходит ограничение Windows на фоновые процессы)."""
@@ -197,21 +230,62 @@ def capture():
     _status = "capturing"
     log.info("─── capture() вызван ───")
 
-    # Читаем то, что пользователь уже скопировал в PokerDom (Ctrl+A, Ctrl+C)
+    wins = find_pokerdom()
+    log.info(f"find_pokerdom: {[(h,t) for h,t in wins]}")
+    if not wins:
+        _status = "error"
+        notify("PDStats Helper", "Окно PokerDom не найдено. Откройте клиент.")
+        return
+
+    hwnd, title = wins[0]
+    log.info(f"Окно: {title!r} hwnd={hwnd}")
+
+    # Выводим PokerDom на передний план
+    force_to_foreground(hwnd)
+    time.sleep(0.5)
+
+    # Ищем Chrome_RenderWidgetHostHWND — реальный рендерер Electron
+    widgets = find_chrome_widget(hwnd)
+    log.info(f"Chrome_RenderWidgetHostHWND: {widgets}")
+
+    render = widgets[-1] if widgets else None
+    if render:
+        try:
+            win32gui.SetFocus(render)
+            log.debug(f"SetFocus → {render}: OK")
+            time.sleep(0.2)
+        except Exception as e:
+            log.warning(f"SetFocus render: {e}")
+
+    # Очищаем буфер
+    try:
+        win32clipboard.OpenClipboard(); win32clipboard.EmptyClipboard(); win32clipboard.CloseClipboard()
+        log.debug("Буфер очищен")
+    except Exception as e:
+        log.warning(f"EmptyClipboard: {e}")
+        try: win32clipboard.CloseClipboard()
+        except: pass
+
+    # Ctrl+A → Ctrl+C через keybd_event (минует хук keyboard-библиотеки)
+    log.debug("Отправляю Ctrl+A...")
+    send_ctrl(VK_A)
+    time.sleep(0.4)
+    log.debug("Отправляю Ctrl+C...")
+    send_ctrl(VK_C)
+    time.sleep(0.7)
+
     text = read_clipboard()
     log.info(f"Буфер: длина={len(text)}, первые 300 симв.: {text[:300]!r}")
 
     if not text or not text.strip():
         _status = "error"
-        log.error("Буфер пуст")
-        notify("PDStats Helper",
-               "Буфер пуст!\n"
-               "В PokerDom: ТУРНИР → выдели всё → Ctrl+C → затем F1")
+        log.error("Буфер пуст после Ctrl+A+C")
+        notify("PDStats Helper", "Буфер пуст. Открой вкладку ТУРНИР в PokerDom и попробуй снова.")
         return
 
     _status = "pushing"
     lines = len([l for l in text.splitlines() if l.strip()])
-    log.info(f"Текст захвачен: {lines} строк, отправляю в GitHub...")
+    log.info(f"Захвачено {lines} строк, отправляю...")
     notify("PDStats Helper", f"{lines} строк — отправляю в GitHub...")
 
     if gh_push(text):
