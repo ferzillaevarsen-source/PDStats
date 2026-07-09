@@ -1150,6 +1150,7 @@ function app() { return {
   _pollTimer:null, _lastSha:'', _ghToken:'',
   _GH_REPO:'ferzillaevarsen-source/PDStats',
   _GH_FILE:'pdimport.json',
+  _localTimer:null, _lastLocalTs:'', _localPort:12345,
 
   startPolling(){
     if(this._pollTimer)return;
@@ -1157,10 +1158,29 @@ function app() { return {
     this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
     this._pollTimer=setInterval(()=>this._poll(),2000);
     this._poll();
+    // Быстрый локальный polling (pdhelper.py localhost:12345)
+    this._localTimer=setInterval(()=>this._pollLocal(),500);
+    this._pollLocal();
   },
   stopPolling(){
     if(this._pollTimer){clearInterval(this._pollTimer);this._pollTimer=null;}
+    if(this._localTimer){clearInterval(this._localTimer);this._localTimer=null;}
     this.autoImportStatus='idle';
+  },
+  async _pollLocal(){
+    try{
+      const r=await Promise.race([
+        fetch('http://127.0.0.1:'+this._localPort+'/data'),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),450))
+      ]);
+      if(!r.ok)return;
+      const d=await r.json();
+      if(!d||d.status==='empty'||!d.ts||!d.text)return;
+      if(d.ts===this._lastLocalTs)return;
+      this._lastLocalTs=d.ts;
+      this.autoImportStatus='importing';
+      this._autoImportDirect(d.text);
+    }catch(e){}
   },
   _autoImportDirect(text){
     try{

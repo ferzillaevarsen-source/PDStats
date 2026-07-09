@@ -3,6 +3,7 @@ PDStats Helper — авто-импорт турнирной истории из 
 F1 → захват (Ctrl+A, Ctrl+C в PokerDom) → push в GitHub → браузер подхватывает
 """
 import sys, time, threading, json, ctypes, base64, logging, traceback
+import http.server, socketserver as _sockserver
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
 HOTKEY        = "f9"   # можно изменить в pdhelper_config.json ("hotkey")
@@ -51,8 +52,36 @@ except ImportError as e:
     sys.exit(1)
 
 # ── Состояние ─────────────────────────────────────────────────────────────────
-_icon   = None
-_status = "idle"
+_icon       = None
+_status     = "idle"
+_local_data = None   # последние захваченные данные — отдаёт локальный HTTP-сервер
+
+# ── Локальный HTTP-сервер (браузер опрашивает напрямую, без GitHub) ────────────
+LOCAL_PORT = 12345
+
+class _Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        body = json.dumps(_local_data or {"status": "empty"}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+    def log_message(self, *_): pass  # не засорять лог
+
+def _start_local_server():
+    _sockserver.TCPServer.allow_reuse_address = True
+    try:
+        with _sockserver.TCPServer(("127.0.0.1", LOCAL_PORT), _Handler) as srv:
+            log.info(f"Локальный сервер запущен: http://127.0.0.1:{LOCAL_PORT}/data")
+            srv.serve_forever()
+    except Exception as e:
+        log.warning(f"Локальный сервер не запустился на порту {LOCAL_PORT}: {e}")
 
 # ── GitHub API ────────────────────────────────────────────────────────────────
 _gh_headers = {
@@ -286,6 +315,12 @@ def capture():
     _status = "pushing"
     lines = len([l for l in text.splitlines() if l.strip()])
     log.info(f"Захвачено {lines} строк, отправляю...")
+
+    # Сразу кладём в локальный сервер — браузер подхватит за ~500мс
+    global _local_data
+    _local_data = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "text": text, "status": "ok"}
+    log.info("Локальные данные обновлены")
+
     notify("PDStats Helper", f"{lines} строк — отправляю в GitHub...")
 
     if gh_push(text):
@@ -330,6 +365,7 @@ def run_tray():
 if __name__ == "__main__":
     log.info(f"Хоткей: {HOTKEY!r}, репо: {GITHUB_REPO}, файл: {GITHUB_FILE}")
     log.info(f"Лог: {_log_path}")
+    threading.Thread(target=_start_local_server, daemon=True).start()
     gh_get_sha()
     log.info(f"Начальный SHA файла: {_file_sha!r}")
     # suppress=True — клавиша не проходит в Windows (без снижения громкости!)
