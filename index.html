@@ -45,8 +45,10 @@ input::placeholder,textarea::placeholder{color:#2d3748}
 .badge-sng{background:rgba(0,200,150,.2);color:#6ee7b7}
 .badge-cash{background:rgba(245,158,11,.2);color:#fcd34d}
 .badge-wf{background:rgba(236,72,153,.2);color:#f9a8d4}
-.cal-day{border-radius:10px;padding:8px;min-height:66px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(255,255,255,0.04);transition:all .2s}
+.cal-day{border-radius:10px;padding:8px;min-height:66px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(255,255,255,0.04);transition:all .2s;position:relative}
 .cal-day.empty-day{background:rgba(255,255,255,0.012);border-color:transparent}
+.cal-del-btn{position:absolute;top:4px;right:4px;font-size:9px;opacity:0;color:#ef4444;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:4px;padding:1px 5px;cursor:pointer;transition:opacity .15s;line-height:1.5}
+.cal-day:hover .cal-del-btn{opacity:1}
 .range-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:#1a1a2e;color:#9ca3af}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#1e1e35;border-radius:2px}
 kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-family:monospace;color:#9ca3af}
@@ -388,10 +390,13 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
             <template x-if="cell.profit!==null">
               <div>
                 <div style="font-size:13px;font-weight:700" :class="cell.profit>=0?'pos':'neg'" x-text="(cell.profit>=0?'+':'')+fmtK(cell.profit)"></div>
-                <div style="font-size:10px;color:#6b7280" x-text="cell.count+' тур.'"></div>
+                <div style="font-size:10px;color:#6b7280" x-text="(cell.count||0)+' тур.'"></div>
               </div>
             </template>
             <template x-if="cell.profit===null"><div style="font-size:10px;color:#1f2937">—</div></template>
+            <template x-if="cell.profit!==null">
+              <button class="cal-del-btn" @click.stop="deleteDaySessions(cell.date)" title="Удалить все турниры этого дня">✕</button>
+            </template>
           </div>
         </div>
       </template>
@@ -1016,17 +1021,19 @@ function app() { return {
     const mk=`${y}-${String(m+1).padStart(2,'0')}`;
     const dayMap={};
     for(const s of this.sessions){
-      if(!s.date.startsWith(mk))continue;
+      if(!s.date||!s.date.startsWith(mk))continue;
       const d=parseInt(s.date.slice(8));
+      if(!d||d<1||d>31)continue;
       if(!dayMap[d])dayMap[d]={profit:0,count:0};
-      dayMap[d].profit+=s.profit;dayMap[d].count++;
+      dayMap[d].profit+=(s.profit||0);dayMap[d].count++;
     }
-    const maxAbs=Math.max(1,...Object.values(dayMap).map(d=>Math.abs(d.profit)));
+    const maxAbs=Math.max(1,...Object.values(dayMap).map(v=>Math.abs(v.profit)));
     const cells=[];
     for(let i=0;i<dow;i++)cells.push({key:'e'+i,empty:true});
     for(let d=1;d<=last;d++){
       const info=dayMap[d];
-      cells.push({key:'d'+d,empty:false,day:d,profit:info?info.profit:null,count:info?info.count:0,intensity:info?Math.max(0.2,Math.abs(info.profit)/maxAbs):0});
+      const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      cells.push({key:'d'+d,empty:false,day:d,date:dateStr,profit:info?info.profit:null,count:info?(info.count||0):0,intensity:info?Math.max(0.2,Math.abs(info.profit)/maxAbs):0});
     }
     return cells;
   },
@@ -1147,6 +1154,7 @@ function app() { return {
   startPolling(){
     if(this._pollTimer)return;
     this._ghToken=localStorage.getItem('pdstats_gh_token')||'';
+    this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
     this._pollTimer=setInterval(()=>this._poll(),5000);
     this._poll();
   },
@@ -1173,8 +1181,6 @@ function app() { return {
     }
   },
   saveGhToken(tok){
-  },
-  saveGhToken(tok){
     this._ghToken=tok.trim();
     localStorage.setItem('pdstats_gh_token',this._ghToken);
     if(this._ghToken){this.autoImportStatus='idle';this._poll();}
@@ -1194,6 +1200,7 @@ function app() { return {
       this.autoImportStatus='ready';
       if(meta.sha&&meta.sha!==this._lastSha){
         this._lastSha=meta.sha;
+        localStorage.setItem('pdstats_last_sha',meta.sha);
         try{
           const raw=atob(meta.content.replace(/\n/g,''));
           const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
@@ -1248,6 +1255,12 @@ function app() { return {
     inp.click();
   },
   clearAll(){this.sessions=[];this.showClearConfirm=false;this.showToast('Все данные удалены','warning');},
+  deleteDaySessions(dateStr){
+    const before=this.sessions.length;
+    this.sessions=this.sessions.filter(s=>s.date!==dateStr);
+    const removed=before-this.sessions.length;
+    if(removed>0)this.showToast('Удалено '+removed+' турниров за '+this.fmtDate(dateStr),'warning');
+  },
 
   // ── Toasts ──
   showToast(msg,type='success'){const t={id:Date.now(),msg,type};this.toasts.push(t);setTimeout(()=>{this.toasts=this.toasts.filter(x=>x.id!==t.id);},3200);},
