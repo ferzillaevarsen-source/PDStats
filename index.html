@@ -632,23 +632,40 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
   <div class="mb-3 rounded-xl overflow-hidden" style="border:1px solid rgba(255,255,255,0.06)">
     <div class="flex items-center gap-3 p-3" style="background:#0a0a1a">
       <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .4s"
-           :style="autoImportStatus==='ready'||autoImportStatus==='importing'?'background:#00c896;box-shadow:0 0 6px #00c896':autoImportStatus==='badtoken'||autoImportStatus==='offline'?'background:#ef4444':'background:#374151'"></div>
-      <span style="font-size:11px;flex:1" :style="autoImportStatus==='badtoken'?'color:#ef4444':autoImportStatus==='ready'?'color:#00c896':'color:#6b7280'" x-text="
-        autoImportStatus==='notoken'?'Введите GitHub Token ниже для авто-импорта':
-        autoImportStatus==='badtoken'?'Токен недействителен — проверьте настройку':
-        autoImportStatus==='offline'?'Нет соединения с GitHub':
-        autoImportStatus==='empty'?'Подключено — нажмите F1 в окне PokerDom':
-        autoImportStatus==='ready'?'Подключено — нажмите F1 в окне PokerDom':
+           :style="autoImportStatus==='ready'||autoImportStatus==='importing'?'background:#00c896;box-shadow:0 0 6px #00c896':(autoImportStatus==='badtoken'||autoImportStatus==='offline'||autoImportStatus==='ratelimited')?'background:#ef4444':'background:#374151'"></div>
+      <span style="font-size:11px;flex:1" :style="(autoImportStatus==='badtoken'||autoImportStatus==='ratelimited')?'color:#ef4444':autoImportStatus==='ready'?'color:#00c896':'color:#6b7280'" x-text="
+        autoImportStatus==='notoken'?'Запустите pdhelper.py, либо введите GitHub-токен ниже для облачного канала':
+        autoImportStatus==='badtoken'?'Токен недействителен или нет доступа к репозиторию':
+        autoImportStatus==='ratelimited'?'Лимит GitHub API исчерпан — пауза, опрос возобновится автоматически':
+        autoImportStatus==='offline'?(_localAlive?'Локальный helper подключён':'Нет соединения (helper не запущен и GitHub недоступен)'):
+        autoImportStatus==='empty'?(_localAlive?'Локальный helper подключён — нажмите F1 в окне PokerDom':'Облачный канал подключён — нажмите F1 в окне PokerDom'):
+        autoImportStatus==='ready'?(_localAlive?'Локальный helper подключён — нажмите F1 в окне PokerDom':'Облачный канал (GitHub) — нажмите F1 в окне PokerDom'):
         autoImportStatus==='importing'?'Импортируется...':
         'Подключение...'
       "></span>
     </div>
-    <!-- Token input (shown only when no token) -->
-    <div x-show="autoImportStatus==='notoken'||autoImportStatus==='badtoken'" class="flex gap-2 p-2" style="background:#060610;border-top:1px solid rgba(255,255,255,0.04)">
-      <input x-ref="tokInput" type="password" placeholder="GitHub Token (ghp_...)" style="flex:1;font-size:11px;padding:6px 10px;background:#0f0f1e">
-      <button @click="saveGhToken($refs.tokInput.value)" style="flex-shrink:0;background:rgba(0,200,150,0.15);border:1px solid rgba(0,200,150,0.3);color:#00c896;padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
-        Сохранить
-      </button>
+    <!-- Token input (когда токена нет / он невалиден / лимит) -->
+    <div x-show="!_ghToken||autoImportStatus==='badtoken'||autoImportStatus==='ratelimited'" style="background:#060610;border-top:1px solid rgba(255,255,255,0.04)">
+      <div class="flex gap-2 p-2">
+        <input x-ref="tokInput" type="password" autocomplete="off" spellcheck="false" placeholder="GitHub-токен (github_pat_… или ghp_…)" style="flex:1;font-size:11px;padding:6px 10px;background:#0f0f1e" @keydown.enter="saveGhToken($refs.tokInput.value);$refs.tokInput.value=''">
+        <button @click="saveGhToken($refs.tokInput.value);$refs.tokInput.value=''" style="flex-shrink:0;background:rgba(0,200,150,0.15);border:1px solid rgba(0,200,150,0.3);color:#00c896;padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+          Сохранить
+        </button>
+      </div>
+      <div class="flex items-center gap-2 px-2 pb-2" style="font-size:11px;color:#6b7280">
+        <input type="checkbox" :checked="_ghRemember" @change="setGhRemember($event.target.checked)" style="width:auto;margin:0;accent-color:#00c896" id="ghRemember">
+        <label for="ghRemember" style="cursor:pointer">Запомнить на этом устройстве</label>
+        <span x-show="!_ghRemember" style="color:#374151">— иначе токен хранится только до закрытия вкладки</span>
+      </div>
+      <div class="px-2 pb-2" style="font-size:10px;line-height:1.5;color:#4b5563">
+        <i class="fas fa-shield-halved" style="color:#f59e0b;margin-right:4px"></i>
+        Для безопасности используйте <b style="color:#6b7280">fine-grained</b> токен с доступом <b style="color:#6b7280">только к этому репозиторию</b> и правом <b style="color:#6b7280">Contents: Read-only</b>. Классический <code style="background:#1a1a2e;padding:0 4px;border-radius:3px">ghp_</code> даёт доступ ко всем вашим репозиториям — не рекомендуется.
+      </div>
+    </div>
+    <!-- Уже подключён: возможность забыть токен -->
+    <div x-show="_ghToken&&autoImportStatus!=='badtoken'&&autoImportStatus!=='ratelimited'" class="flex items-center justify-between px-3 py-2" style="background:#060610;border-top:1px solid rgba(255,255,255,0.04);font-size:11px;color:#4b5563">
+      <span><i class="fas fa-cloud" style="margin-right:5px"></i>Облачный канал: токен сохранён<span x-show="!_ghRemember"> (только на сессию)</span></span>
+      <button @click="forgetGhToken()" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:11px">Забыть токен</button>
     </div>
   </div>
   <div class="flex gap-3 flex-wrap">
@@ -1147,40 +1164,59 @@ function app() { return {
     this.showToast(`Экспортировано ${this.sessions.length} записей`);
   },
 
-  _pollTimer:null, _lastSha:'', _ghToken:'',
+  _pollTimer:null, _lastSha:'', _ghToken:'', _ghRemember:true,
   _GH_REPO:'ferzillaevarsen-source/PDStats',
   _GH_FILE:'pdimport.json',
   _localTimer:null, _lastLocalTs:'', _localPort:12345,
+  // Координация каналов и бэкофф
+  _localAlive:false, _localSkip:0,   // локальный helper — основной канал
+  _ghSkip:0, _ghRemaining:null,      // GitHub — фолбэк, с бэкоффом по ошибкам/лимитам
+  _timeout(ms){return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));},
 
   startPolling(){
     if(this._pollTimer)return;
-    this._ghToken=localStorage.getItem('pdstats_gh_token')||'';
+    // Режим хранения токена: localStorage (запомнить) или sessionStorage (только сессия)
+    const rem=localStorage.getItem('pdstats_gh_remember');
+    this._ghRemember=rem===null?true:rem==='1';
+    this._ghToken=(this._ghRemember?localStorage.getItem('pdstats_gh_token'):sessionStorage.getItem('pdstats_gh_token'))||'';
     this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
-    this._pollTimer=setInterval(()=>this._poll(),2000);
-    this._poll();
-    // Быстрый локальный polling (pdhelper.py localhost:12345)
-    this._localTimer=setInterval(()=>this._pollLocal(),500);
-    this._pollLocal();
+    // Локальный helper (127.0.0.1) — основной канал; GitHub — фолбэк
+    this._localTimer=setInterval(()=>this._tickLocal(),700);
+    this._pollTimer=setInterval(()=>this._tickGh(),2000);
+    this._tickLocal();
+    this._tickGh();
+    // Пауза, когда вкладка скрыта; мгновенный опрос при возврате
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){this._localSkip=0;this._ghSkip=0;this._tickLocal();this._tickGh();}});
   },
   stopPolling(){
     if(this._pollTimer){clearInterval(this._pollTimer);this._pollTimer=null;}
     if(this._localTimer){clearInterval(this._localTimer);this._localTimer=null;}
     this.autoImportStatus='idle';
   },
-  async _pollLocal(){
+  async _tickLocal(){
+    if(document.hidden)return;
+    // Если helper недоступен — не долбим localhost каждые 700мс, а раз в ~4с
+    if(!this._localAlive&&this._localSkip>0){this._localSkip--;return;}
     try{
       const r=await Promise.race([
         fetch('http://127.0.0.1:'+this._localPort+'/data'),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),450))
+        this._timeout(450)
       ]);
-      if(!r.ok)return;
+      if(!r.ok)throw 0;
       const d=await r.json();
+      this._localAlive=true;this._localSkip=0;
+      // Локальный канал жив — его статус приоритетнее любых ошибок GitHub
+      if(this.autoImportStatus!=='importing')this.autoImportStatus='ready';
       if(!d||d.status==='empty'||!d.ts||!d.text)return;
       if(d.ts===this._lastLocalTs)return;
       this._lastLocalTs=d.ts;
       this.autoImportStatus='importing';
       this._autoImportDirect(d.text);
-    }catch(e){}
+    }catch(e){
+      // helper не запущен — переключаемся на GitHub-фолбэк
+      if(this._localAlive)this._localAlive=false;
+      this._localSkip=5;
+    }
   },
   _autoImportDirect(text){
     try{
@@ -1201,23 +1237,62 @@ function app() { return {
     }
   },
   saveGhToken(tok){
-    this._ghToken=tok.trim();
-    localStorage.setItem('pdstats_gh_token',this._ghToken);
-    if(this._ghToken){this.autoImportStatus='idle';this._poll();}
+    tok=(tok||'').trim();
+    // Базовая проверка формата, чтобы не сохранить случайную строку
+    if(tok&&!/^(gh[posur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})$/.test(tok)){
+      this.showToast('Похоже, это не GitHub-токен (ожидается ghp_… или github_pat_…)','warning');
+      return;
+    }
+    this._ghToken=tok;
+    const store=this._ghRemember?localStorage:sessionStorage;
+    const other=this._ghRemember?sessionStorage:localStorage;
+    other.removeItem('pdstats_gh_token');
+    if(tok)store.setItem('pdstats_gh_token',tok);else store.removeItem('pdstats_gh_token');
+    localStorage.setItem('pdstats_gh_remember',this._ghRemember?'1':'0');
+    this._ghSkip=0;
+    if(tok){this.autoImportStatus='idle';this.showToast('Токен сохранён');this._tickGh();}
   },
-  async _poll(){
-    if(!this._ghToken){this.autoImportStatus='notoken';return;}
+  setGhRemember(v){
+    this._ghRemember=!!v;
+    localStorage.setItem('pdstats_gh_remember',this._ghRemember?'1':'0');
+    // Переносим уже введённый токен в выбранное хранилище
+    if(this._ghToken)this.saveGhToken(this._ghToken);
+  },
+  forgetGhToken(){
+    this._ghToken='';
+    localStorage.removeItem('pdstats_gh_token');sessionStorage.removeItem('pdstats_gh_token');
+    this._lastSha='';localStorage.removeItem('pdstats_last_sha');
+    this._ghRemaining=null;this._ghSkip=0;
+    this.autoImportStatus=this._localAlive?'ready':'notoken';
+    this.showToast('Токен удалён','warning');
+  },
+  async _tickGh(){
+    if(document.hidden)return;
+    if(!this._ghToken){if(!this._localAlive)this.autoImportStatus='notoken';return;}
+    // Локальный канал — приоритетный: пока helper жив, GitHub не трогаем (экономим лимит API)
+    if(this._localAlive)return;
+    if(this._ghSkip>0){this._ghSkip--;return;}
     const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/'+this._GH_FILE;
     try{
       const r=await Promise.race([
-        fetch(url,{headers:{Authorization:'token '+this._ghToken,Accept:'application/vnd.github.v3+json'}}),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('t')),4000))
+        fetch(url,{headers:{Authorization:'token '+this._ghToken,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}}),
+        this._timeout(4000)
       ]);
+      const rem=r.headers.get('x-ratelimit-remaining');
+      if(rem!==null)this._ghRemaining=+rem;
+      if(r.status===401){this.autoImportStatus='badtoken';this._ghSkip=15;return;}
+      if(r.status===403){
+        // 403 = либо исчерпан лимит, либо нет доступа к репозиторию
+        if(rem==='0'){this.autoImportStatus='ratelimited';this._ghSkip=30;} // ~60с паузы
+        else{this.autoImportStatus='badtoken';this._ghSkip=15;}
+        return;
+      }
       if(r.status===404){this.autoImportStatus='empty';return;}
-      if(r.status===401){this.autoImportStatus='badtoken';return;}
-      if(!r.ok){this.autoImportStatus='error';return;}
+      if(!r.ok){this.autoImportStatus='error';this._ghSkip=5;return;}
       const meta=await r.json();
       this.autoImportStatus='ready';
+      // Бережём остаток лимита: при малом остатке реже опрашиваем
+      if(this._ghRemaining!==null&&this._ghRemaining<50)this._ghSkip=15;
       if(meta.sha&&meta.sha!==this._lastSha){
         this._lastSha=meta.sha;
         localStorage.setItem('pdstats_last_sha',meta.sha);
@@ -1232,7 +1307,7 @@ function app() { return {
         }catch(e){this.autoImportStatus='error';}
       }
     }catch(e){
-      this.autoImportStatus='offline';
+      this.autoImportStatus='offline';this._ghSkip=5;
     }
   },
     exportCSV(){
