@@ -218,21 +218,58 @@ def capture():
     time.sleep(0.6)
     log.debug("Ctrl+A, Ctrl+C отправлены")
 
-    # Читаем результат
+    # Читаем результат — перебираем все доступные форматы
     text = ""
     try:
         win32clipboard.OpenClipboard()
+
+        # Перечисляем все форматы в буфере
+        fmt_list = []
+        fmt = win32clipboard.EnumClipboardFormats(0)
+        while fmt:
+            try:
+                fname = win32clipboard.GetClipboardFormatName(fmt)
+            except Exception:
+                fname = f"#{fmt}"
+            fmt_list.append(f"{fmt}={fname}")
+            fmt = win32clipboard.EnumClipboardFormats(fmt)
+        log.info(f"Форматы в буфере: {fmt_list}")
+
+        # Пробуем CF_UNICODETEXT (13)
         try:
             text = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
-        except Exception as e:
-            log.warning(f"GetClipboardData(CF_UNICODETEXT) failed: {e}")
+            log.info("Прочитан CF_UNICODETEXT")
+        except Exception:
+            pass
+
+        # Если не вышло — пробуем CF_TEXT (1, ANSI)
+        if not text:
+            try:
+                raw = win32clipboard.GetClipboardData(win32con.CF_TEXT)
+                text = raw.decode("cp1251", errors="replace") if isinstance(raw, bytes) else str(raw)
+                log.info("Прочитан CF_TEXT (cp1251)")
+            except Exception as e:
+                log.warning(f"CF_TEXT failed: {e}")
+
+        # Если не вышло — пробуем HTML Format
+        if not text:
+            try:
+                html_fmt = win32clipboard.RegisterClipboardFormat("HTML Format")
+                raw = win32clipboard.GetClipboardData(html_fmt)
+                if isinstance(raw, bytes):
+                    raw = raw.decode("utf-8", errors="replace")
+                log.info(f"Прочитан HTML Format (первые 500): {raw[:500]!r}")
+                text = raw  # парсер разберётся или покажем в логе
+            except Exception as e:
+                log.warning(f"HTML Format failed: {e}")
+
         win32clipboard.CloseClipboard()
     except Exception as e:
         log.error(f"OpenClipboard failed: {e}")
         try: win32clipboard.CloseClipboard()
         except: pass
 
-    log.info(f"Буфер обмена: длина={len(text)}, первые 200 симв.: {text[:200]!r}")
+    log.info(f"Буфер обмена итог: длина={len(text)}, первые 300 симв.: {text[:300]!r}")
 
     if not text or not text.strip():
         _status = "error"
