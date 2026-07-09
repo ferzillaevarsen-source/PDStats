@@ -108,7 +108,39 @@ def capture():
     global _status
     _status = "capturing"
 
-    # Читаем что уже в буфере (пользователь сам сделал Ctrl+A, Ctrl+C в PokerDom)
+    wins = find_pokerdom()
+    if not wins:
+        _status = "error"
+        notify("PDStats Helper", "Окно PokerDom не найдено. Откройте клиент.")
+        return
+
+    hwnd, _ = wins[0]
+
+    # Активируем окно PokerDom
+    try:
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+        win32gui.SetForegroundWindow(hwnd)
+    except Exception:
+        pass
+    time.sleep(0.5)
+
+    # Очищаем буфер перед копированием
+    try:
+        win32clipboard.OpenClipboard()
+        win32clipboard.EmptyClipboard()
+        win32clipboard.CloseClipboard()
+    except Exception:
+        try: win32clipboard.CloseClipboard()
+        except: pass
+
+    # Ctrl+A → Ctrl+C
+    keyboard.send("ctrl+a")
+    time.sleep(0.2)
+    keyboard.send("ctrl+c")
+    time.sleep(0.5)
+
+    # Читаем результат
     text = ""
     try:
         win32clipboard.OpenClipboard()
@@ -123,13 +155,7 @@ def capture():
 
     if not text or not text.strip():
         _status = "error"
-        notify("PDStats Helper", "Буфер пуст. Сначала выдели всё в PokerDom (Ctrl+A → Ctrl+C), затем F1.")
-        return
-
-    # Проверяем что это похоже на историю турниров
-    if "хождение" not in text and "Вхождение" not in text and "\t" not in text:
-        _status = "error"
-        notify("PDStats Helper", "В буфере не история турниров. Скопируй вкладку Турнир в PokerDom.")
+        notify("PDStats Helper", "Буфер пуст. Открой вкладку Турнир в PokerDom и попробуй снова.")
         return
 
     _status = "pushing"

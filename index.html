@@ -1245,7 +1245,9 @@ function app() { return {
           let added=0;
           for(const s of parsed){const key=[s.tournamentName||'',s.buyIn,s.place,s.prize,s.date].join('|');if(!this.sessions.some(e=>e._key===key)){s._key=key;this.sessions.push(s);added++;}}
           this.importSuccess=`Добавлено ${added} записей (${parsed.length-added} дубликатов пропущено).`;
-          if(added>0){this.importText='';this.showToast(`Импортировано ${added} турниров`);setTimeout(()=>{this.page='stats';this.$nextTick(()=>this.renderChart());},1600);}
+          this.importText='';
+          if(added>0){this.showToast(`Импортировано ${added} турниров`);setTimeout(()=>{this.page='stats';this.$nextTick(()=>this.renderChart());},1600);}
+          else{this.showToast('Все записи уже есть — дубликаты пропущены');}
         }
       }catch(e){this.importError='Ошибка: '+e.message;}
       this.importing=false;
