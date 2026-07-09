@@ -1,11 +1,11 @@
 """
 PDStats Helper — авто-импорт турнирной истории из PokerDom
-F1 → захват → push в GitHub → браузер подхватывает автоматически
+Ctrl+Shift+P → захват → push в GitHub → браузер подхватывает автоматически
 """
 import sys, time, threading, json, ctypes, base64
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
-HOTKEY        = "f1"
+HOTKEY        = "ctrl+shift+p"  # можно изменить в pdhelper_config.json
 GITHUB_REPO   = "ferzillaevarsen-source/PDStats"
 GITHUB_BRANCH = "main"
 GITHUB_FILE   = "pdimport.json"
@@ -21,10 +21,11 @@ if not _cfg_path.exists():
         "PDStats Helper — первый запуск", 0x40)
 _cfg = json.loads(_cfg_path.read_text(encoding="utf-8"))
 GITHUB_TOKEN = _cfg.get("github_token", "")
+HOTKEY       = _cfg.get("hotkey", HOTKEY)  # override from config if set
 
 # ── Зависимости ───────────────────────────────────────────────────────────────
 try:
-    import win32gui, win32con, win32clipboard
+    import win32gui, win32con, win32clipboard, win32api
     import keyboard
     import pystray
     import requests
@@ -123,7 +124,21 @@ def capture():
         win32gui.SetForegroundWindow(hwnd)
     except Exception:
         pass
-    time.sleep(0.5)
+    time.sleep(0.7)
+
+    # Кликаем в центр нижней части окна — это область таблицы турниров
+    try:
+        rect = win32gui.GetWindowRect(hwnd)
+        cx = (rect[0] + rect[2]) // 2
+        cy = rect[1] + (rect[3] - rect[1]) * 2 // 3  # 2/3 вниз (область таблицы)
+        win32api.SetCursorPos((cx, cy))
+        time.sleep(0.15)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+        time.sleep(0.05)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+        time.sleep(0.3)
+    except Exception:
+        pass
 
     # Очищаем буфер перед копированием
     try:
@@ -136,9 +151,9 @@ def capture():
 
     # Ctrl+A → Ctrl+C
     keyboard.send("ctrl+a")
-    time.sleep(0.2)
+    time.sleep(0.35)
     keyboard.send("ctrl+c")
-    time.sleep(0.5)
+    time.sleep(0.7)
 
     # Читаем результат
     text = ""
@@ -187,7 +202,7 @@ def notify(title, msg):
 def run_tray():
     global _icon
     menu = pystray.Menu(
-        pystray.MenuItem(f"F1 — захват из PokerDom", None, enabled=False),
+        pystray.MenuItem(f"{HOTKEY.upper()} — захват из PokerDom", None, enabled=False),
         pystray.MenuItem(f"Репо: {GITHUB_REPO}", None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Захватить сейчас", lambda i, _: on_hotkey()),
