@@ -114,13 +114,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
     </div>
   </div>
   <div x-show="sessions.length>0">
-    <!-- Sub-tabs -->
-    <div class="flex items-center gap-2 mb-4">
-      <button class="sub-tab" :class="statsTab==='all'&&'active'" @click="statsTab='all'">Общее</button>
-      <button class="sub-tab" :class="statsTab==='mtt'&&'active'" @click="statsTab='mtt'">Tournaments</button>
-      <button class="sub-tab" :class="statsTab==='cash'&&'active'" @click="statsTab='cash'">Cash</button>
-      <button class="sub-tab" :class="statsTab==='windfall'&&'active'" @click="statsTab='windfall'">Windfall</button>
-    </div>
     <!-- Filter -->
     <div class="card p-4 mb-4 flex flex-wrap items-center gap-3">
       <input type="date" x-model="dateFrom" style="width:auto">
@@ -220,12 +213,6 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
     <p>Нет данных для анализа</p>
   </div>
   <div x-show="sessions.length>0">
-    <div class="flex items-center gap-2 mb-4">
-      <button class="sub-tab" :class="statsTab==='all'&&'active'" @click="statsTab='all'">Общее</button>
-      <button class="sub-tab" :class="statsTab==='mtt'&&'active'" @click="statsTab='mtt'">Tournaments</button>
-      <button class="sub-tab" :class="statsTab==='cash'&&'active'" @click="statsTab='cash'">Cash</button>
-      <button class="sub-tab" :class="statsTab==='windfall'&&'active'" @click="statsTab='windfall'">Windfall</button>
-    </div>
     <!-- Streak + Median -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
       <div class="card p-4" :style="`border-left:3px solid ${currentStreak.isWin?'#00c896':'#ef4444'}`">
@@ -697,7 +684,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
   <!-- Filters -->
   <div class="card p-4 mb-4 flex flex-wrap gap-3 items-center">
     <select x-model="sType" @change="sessionsPage=1" style="width:auto">
-      <option value="">Все типы</option><option>MTT</option><option>SNG</option><option>Cash</option><option>Windfall</option>
+      <option value="">Все типы</option><option>MTT</option>
     </select>
     <select x-model="sLeague" @change="sessionsPage=1" style="width:auto">
       <option value="">Все лиги</option>
@@ -800,7 +787,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Дата</label><input type="date" x-model="ns.date"></div>
       <div class="grid grid-cols-2 gap-3">
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Тип</label>
-          <select x-model="ns.type"><option>MTT</option><option>SNG</option><option>Cash</option><option>Windfall</option></select></div>
+          <select x-model="ns.type"><option>MTT</option></select></div>
         <div><label style="font-size:11px;color:#6b7280;display:block;margin-bottom:3px">Лига</label>
           <select x-model="ns.leagueId">
             <option value="">— нет —</option>
