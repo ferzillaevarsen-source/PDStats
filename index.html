@@ -36,8 +36,9 @@ input,select,textarea{background:#13132a;border:1px solid rgba(255,255,255,0.1);
 input:focus,select:focus,textarea:focus{border-color:#00c896}
 input::placeholder,textarea::placeholder{color:#2d3748}
 .pos{color:#00c896}.neg{color:#ff4444}
-@keyframes chart-blink{0%,100%{opacity:1}50%{opacity:0.25}}
-.chart-end-label{position:absolute;right:0;transform:translateY(-50%);padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid;pointer-events:none;white-space:nowrap;animation:chart-blink 1.4s ease-in-out infinite;z-index:10;background:#0a0a1a}
+@keyframes chart-ripple{0%{transform:scale(1);opacity:0.9}100%{transform:scale(1.8);opacity:0}}
+.chart-end-label{position:absolute;right:0;transform:translateY(-50%);padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid;pointer-events:none;white-space:nowrap;z-index:10;background:#0a0a1a}
+.chart-end-label::after{content:'';position:absolute;inset:-3px;border-radius:22px;border:1.5px solid currentColor;animation:chart-ripple 1.6s ease-out infinite}
 .tbl-head th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#4b5563;padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.06);user-select:none}
 .tbl-head th:first-child{text-align:left}
 .tbl-head th.sort{cursor:pointer}.tbl-head th.sort:hover{color:#9ca3af}
