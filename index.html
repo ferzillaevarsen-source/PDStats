@@ -331,65 +331,151 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
 
 <!-- ══════════════════ CALENDAR ══════════════════ -->
 <div x-show="page==='calendar'">
-  <div class="card p-5 mb-4" style="background:linear-gradient(135deg,#1a0a3a,#0f1a3a)">
-    <div class="flex items-center justify-between mb-4">
-      <button @click="calPrevMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-left"></i></button>
-      <div class="text-center">
-        <div style="font-size:19px;font-weight:800;color:white" x-text="calMonthName()"></div>
+  <!-- Переключатель вид -->
+  <div class="flex gap-2 mb-4">
+    <button class="preset-btn" :class="calView==='month'&&'active'" @click="calView='month'"><i class="fas fa-calendar-day mr-1"></i>Месяц</button>
+    <button class="preset-btn" :class="calView==='year'&&'active'" @click="calView='year'"><i class="fas fa-calendar mr-1"></i>Год</button>
+  </div>
+
+  <!-- ── МЕСЯЦ В ЦИФРАХ ── -->
+  <div x-show="calView==='month'">
+    <div class="card p-5 mb-4" style="background:linear-gradient(135deg,#1a0a3a,#0f1a3a)">
+      <div class="flex items-center justify-between mb-1">
+        <button @click="calPrevMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-left"></i></button>
+        <div class="text-center">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Месяц в цифрах</div>
+          <div style="font-size:19px;font-weight:800;color:white" x-text="calMonthName()"></div>
+        </div>
+        <button @click="calNextMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-right"></i></button>
       </div>
-      <button @click="calNextMonth()" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-right"></i></button>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Результат (МТТ)</div>
+          <div style="font-size:17px;font-weight:800" :class="calStats.total>=0?'pos':'neg'" x-text="(calStats.total>=0?'+':'')+fmt(calStats.total)"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Турниров</div>
+          <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="calStats.count"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Средний ABI</div>
+          <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="fmt(calStats.avgBuyIn)"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">ROI</div>
+          <div style="font-size:17px;font-weight:800" :class="calStats.roi>=0?'pos':'neg'" x-text="(calStats.roi>=0?'+':'')+calStats.roi.toFixed(1)+'%'"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">ITM</div>
+          <div style="font-size:17px;font-weight:800;color:#00c896" x-text="calStats.itm.toFixed(1)+'%'"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:3px;display:flex;align-items:center;gap:4px"><i class="fas fa-star" style="color:#22c55e;font-size:9px"></i>Лучший день</div>
+          <div style="font-size:16px;font-weight:800;color:#00c896" x-text="calStats.best?fmt(calStats.best.profit):'—'"></div>
+          <div style="font-size:11px;color:#4b5563" x-text="calStats.best?calStats.best.label:''"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:3px;display:flex;align-items:center;gap:4px"><i class="fas fa-star" style="color:#ef4444;font-size:9px"></i>Худший день</div>
+          <div style="font-size:16px;font-weight:800;color:#ff4444" x-text="calStats.worst?fmt(calStats.worst.profit):'—'"></div>
+          <div style="font-size:11px;color:#4b5563" x-text="calStats.worst?calStats.worst.label:''"></div>
+        </div>
+        <div x-show="calStats.count===0" style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px;display:flex;align-items:center">
+          <span style="font-size:12px;color:#374151">Нет игр в этом месяце</span>
+        </div>
+      </div>
     </div>
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-      <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Результат</div>
-        <div style="font-size:17px;font-weight:800" :class="calStats.total>=0?'pos':'neg'" x-text="(calStats.total>=0?'+':'')+fmt(calStats.total)"></div>
+    <div class="card p-4">
+      <div class="grid grid-cols-7 gap-2 mb-2">
+        <template x-for="d in ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС']">
+          <div style="text-align:center;font-size:10px;font-weight:600;color:#4b5563;padding:3px" x-text="d"></div>
+        </template>
       </div>
-      <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Турниров</div>
-        <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="calStats.count"></div>
-      </div>
-      <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
-        <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Ср. взнос</div>
-        <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="fmt(calStats.avgBuyIn)"></div>
-      </div>
-      <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
-        <div style="font-size:10px;color:#6b7280;margin-bottom:3px"><i class="fas fa-star" style="color:#22c55e;font-size:9px"></i> Лучший день</div>
-        <div style="font-size:16px;font-weight:800;color:#00c896" x-text="calStats.best?fmt(calStats.best.profit):'—'"></div>
-        <div style="font-size:11px;color:#4b5563" x-text="calStats.best?calStats.best.label:''"></div>
-      </div>
-      <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
-        <div style="font-size:10px;color:#6b7280;margin-bottom:3px"><i class="fas fa-star" style="color:#ef4444;font-size:9px"></i> Худший день</div>
-        <div style="font-size:16px;font-weight:800;color:#ff4444" x-text="calStats.worst?fmt(calStats.worst.profit):'—'"></div>
-        <div style="font-size:11px;color:#4b5563" x-text="calStats.worst?calStats.worst.label:''"></div>
+      <div class="grid grid-cols-7 gap-2">
+        <template x-for="cell in calendarCells" :key="cell.key">
+          <div>
+            <div x-show="cell.empty" style="min-height:66px"></div>
+            <div x-show="!cell.empty" class="cal-day"
+                 :class="cell.profit===null&&'empty-day'"
+                 :style="cell.profit!==null?(cell.profit>=0?`background:rgba(0,200,150,${0.06+0.38*cell.intensity});border-color:rgba(16,185,129,${0.25+0.6*cell.intensity})`:`background:rgba(239,68,68,${0.08+0.4*cell.intensity});border-color:rgba(239,68,68,${0.25+0.65*cell.intensity})`):''"
+            >
+              <div style="font-size:12px;font-weight:700;color:#6b7280" x-text="cell.day"></div>
+              <template x-if="cell.profit!==null">
+                <div>
+                  <div style="font-size:13px;font-weight:700" :class="cell.profit>=0?'pos':'neg'" x-text="(cell.profit>=0?'+':'')+fmtK(cell.profit)"></div>
+                  <div style="font-size:10px;color:#6b7280" x-text="(cell.count||0)+' тур.'"></div>
+                </div>
+              </template>
+              <template x-if="cell.profit===null"><div style="font-size:10px;color:#1f2937">—</div></template>
+              <template x-if="cell.profit!==null">
+                <button class="cal-del-btn" @click.stop="deleteDaySessions(cell.date)" title="Удалить все турниры этого дня">✕</button>
+              </template>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
-  <div class="card p-4">
-    <div class="grid grid-cols-7 gap-2 mb-2">
-      <template x-for="d in ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС']">
-        <div style="text-align:center;font-size:10px;font-weight:600;color:#4b5563;padding:3px" x-text="d"></div>
-      </template>
+
+  <!-- ── ГОД В ЦИФРАХ ── -->
+  <div x-show="calView==='year'">
+    <div class="card p-5 mb-4" style="background:linear-gradient(135deg,#0a1a3a,#0f0a3a)">
+      <div class="flex items-center justify-between mb-1">
+        <button @click="calYear--" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-left"></i></button>
+        <div class="text-center">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Год в цифрах</div>
+          <div style="font-size:19px;font-weight:800;color:white" x-text="calYear+' год'"></div>
+        </div>
+        <button @click="calYear++" class="btn-ghost" style="padding:6px 12px"><i class="fas fa-chevron-right"></i></button>
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Результат (МТТ)</div>
+          <div style="font-size:17px;font-weight:800" :class="yearStats.total>=0?'pos':'neg'" x-text="(yearStats.total>=0?'+':'')+fmt(yearStats.total)"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Турниров</div>
+          <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="yearStats.count"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">Средний ABI</div>
+          <div style="font-size:17px;font-weight:800;color:#e2e8f0" x-text="fmt(yearStats.avgBuyIn)"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">ROI</div>
+          <div style="font-size:17px;font-weight:800" :class="yearStats.roi>=0?'pos':'neg'" x-text="(yearStats.roi>=0?'+':'')+yearStats.roi.toFixed(1)+'%'"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;text-transform:uppercase;margin-bottom:3px">ITM</div>
+          <div style="font-size:17px;font-weight:800;color:#00c896" x-text="yearStats.itm.toFixed(1)+'%'"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:3px;display:flex;align-items:center;gap:4px"><i class="fas fa-star" style="color:#22c55e;font-size:9px"></i>Лучший день</div>
+          <div style="font-size:16px;font-weight:800;color:#00c896" x-text="yearStats.best?fmt(yearStats.best.profit):'—'"></div>
+          <div style="font-size:11px;color:#4b5563" x-text="yearStats.best?yearStats.best.label:''"></div>
+        </div>
+        <div style="background:rgba(0,0,0,.3);border-radius:9px;padding:11px">
+          <div style="font-size:10px;color:#6b7280;margin-bottom:3px;display:flex;align-items:center;gap:4px"><i class="fas fa-star" style="color:#ef4444;font-size:9px"></i>Худший день</div>
+          <div style="font-size:16px;font-weight:800;color:#ff4444" x-text="yearStats.worst?fmt(yearStats.worst.profit):'—'"></div>
+          <div style="font-size:11px;color:#4b5563" x-text="yearStats.worst?yearStats.worst.label:''"></div>
+        </div>
+      </div>
     </div>
-    <div class="grid grid-cols-7 gap-2">
-      <template x-for="cell in calendarCells" :key="cell.key">
-        <div>
-          <div x-show="cell.empty" style="min-height:66px"></div>
-          <div x-show="!cell.empty" class="cal-day"
-               :class="cell.profit===null&&'empty-day'"
-               :style="cell.profit!==null?(cell.profit>=0?`background:rgba(0,200,150,${0.06+0.38*cell.intensity});border-color:rgba(16,185,129,${0.25+0.6*cell.intensity})`:`background:rgba(239,68,68,${0.08+0.4*cell.intensity});border-color:rgba(239,68,68,${0.25+0.65*cell.intensity})`):''"
-          >
-            <div style="font-size:12px;font-weight:700;color:#6b7280" x-text="cell.day"></div>
-            <template x-if="cell.profit!==null">
-              <div>
-                <div style="font-size:13px;font-weight:700" :class="cell.profit>=0?'pos':'neg'" x-text="(cell.profit>=0?'+':'')+fmtK(cell.profit)"></div>
-                <div style="font-size:10px;color:#6b7280" x-text="(cell.count||0)+' тур.'"></div>
-              </div>
-            </template>
-            <template x-if="cell.profit===null"><div style="font-size:10px;color:#1f2937">—</div></template>
-            <template x-if="cell.profit!==null">
-              <button class="cal-del-btn" @click.stop="deleteDaySessions(cell.date)" title="Удалить все турниры этого дня">✕</button>
-            </template>
-          </div>
+    <!-- Сетка месяцев -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <template x-for="m in yearMonths" :key="m.idx">
+        <div class="card p-4 cursor-pointer"
+             :style="m.count>0?(m.profit>=0?'border-color:rgba(0,200,150,0.35);background:rgba(0,200,150,0.06)':'border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06)'):''"
+             @click="calMonth=m.idx;calView='month'">
+          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px" x-text="m.name"></div>
+          <template x-if="m.count>0">
+            <div>
+              <div style="font-size:17px;font-weight:800" :class="m.profit>=0?'pos':'neg'" x-text="(m.profit>=0?'+':'')+fmt(m.profit)"></div>
+              <div style="font-size:11px;color:#4b5563;margin-top:3px" x-text="m.count+' тур.'"></div>
+            </div>
+          </template>
+          <template x-if="m.count===0">
+            <div style="font-size:13px;color:#1f2937;margin-top:4px">Нет данных</div>
+          </template>
         </div>
       </template>
     </div>
@@ -936,7 +1022,7 @@ const RANGES=[
 function app() { return {
   LEAGUES, page:'stats', sessions:[],
   statsTab:'all', dateFrom:'', dateTo:'', preset:'all', activeFrom:'', activeTo:'', searchQuery:'', chartMode:'count',
-  calYear:new Date().getFullYear(), calMonth:new Date().getMonth(),
+  calYear:new Date().getFullYear(), calMonth:new Date().getMonth(), calView:'month',
   selectedLeague:null,
   importText:'', importDate:'', importError:'', importSuccess:'', importing:false, autoImportStatus:'idle',
   sType:'', sFrom:'', sTo:'', sSearch:'', sLeague:'',
@@ -1087,15 +1173,41 @@ function app() { return {
   },
   get calStats(){
     const y=this.calYear,m=this.calMonth,mk=`${y}-${String(m+1).padStart(2,'0')}`;
-    const ss=this.sessions.filter(s=>s.date.startsWith(mk));
-    if(!ss.length)return{total:0,count:0,avgBuyIn:0,best:null,worst:null};
+    const ss=this.sessions.filter(s=>s.date&&s.date.startsWith(mk));
+    if(!ss.length)return{total:0,count:0,avgBuyIn:0,best:null,worst:null,roi:0,itm:0};
     const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
     const byDay={};
-    for(const s of ss){const d=parseInt(s.date.slice(8));if(!byDay[d])byDay[d]={profit:0,label:d+' '+mo[m]};byDay[d].profit+=s.profit;}
+    for(const s of ss){const d=parseInt(s.date.slice(8));if(!byDay[d])byDay[d]={profit:0,label:d+' '+mo[m]};byDay[d].profit+=(s.profit||0);}
     const days=Object.values(byDay);
     const best=days.length?days.reduce((b,d)=>d.profit>b.profit?d:b):null;
     const worst=days.length?days.reduce((b,d)=>d.profit<b.profit?d:b):null;
-    return{total:ss.reduce((a,s)=>a+s.profit,0),count:ss.length,avgBuyIn:ss.reduce((a,s)=>a+s.buyIn,0)/ss.length,best,worst};
+    const invested=ss.reduce((a,s)=>a+(s.buyIn||0),0);
+    const profit=ss.reduce((a,s)=>a+(s.profit||0),0);
+    return{total:profit,count:ss.length,avgBuyIn:ss.length?invested/ss.length:0,best,worst,roi:invested?(profit/invested)*100:0,itm:ss.filter(s=>s.prize>0).length/ss.length*100};
+  },
+  get yearStats(){
+    const y=this.calYear,yk=String(y);
+    const ss=this.sessions.filter(s=>s.date&&s.date.startsWith(yk));
+    if(!ss.length)return{total:0,count:0,avgBuyIn:0,best:null,worst:null,roi:0,itm:0};
+    const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+    const byDay={};
+    for(const s of ss){const k=s.date;if(!byDay[k])byDay[k]={profit:0,label:(+s.date.slice(8,10))+' '+mo[+s.date.slice(5,7)-1]};byDay[k].profit+=(s.profit||0);}
+    const days=Object.values(byDay);
+    const best=days.length?days.reduce((b,d)=>d.profit>b.profit?d:b):null;
+    const worst=days.length?days.reduce((b,d)=>d.profit<b.profit?d:b):null;
+    const invested=ss.reduce((a,s)=>a+(s.buyIn||0),0);
+    const profit=ss.reduce((a,s)=>a+(s.profit||0),0);
+    return{total:profit,count:ss.length,avgBuyIn:ss.length?invested/ss.length:0,best,worst,roi:invested?(profit/invested)*100:0,itm:ss.filter(s=>s.prize>0).length/ss.length*100};
+  },
+  get yearMonths(){
+    const y=this.calYear;
+    const mo=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    return mo.map((name,i)=>{
+      const mk=`${y}-${String(i+1).padStart(2,'0')}`;
+      const ss=this.sessions.filter(s=>s.date&&s.date.startsWith(mk));
+      const profit=ss.reduce((a,s)=>a+(s.profit||0),0);
+      return{name,idx:i,profit,count:ss.length};
+    });
   },
   calPrevMonth(){if(this.calMonth===0){this.calMonth=11;this.calYear--;}else this.calMonth--;},
   calNextMonth(){if(this.calMonth===11){this.calMonth=0;this.calYear++;}else this.calMonth++;},
@@ -1544,65 +1656,71 @@ function app() { return {
   // ── Charts ──
   renderChart(){
     const canvas=document.getElementById('mainChart');if(!canvas)return;
-    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderChart(),200);return;}
-    const sorted=[...this.statSessions].sort((a,b)=>a.date.localeCompare(b.date));
+    if(!canvas.offsetWidth||!canvas.offsetHeight){if(this.page==='stats')setTimeout(()=>this.renderChart(),200);return;}
+    const sorted=[...this.statSessions].filter(s=>s&&s.date).sort((a,b)=>a.date.localeCompare(b.date));
     if(!sorted.length){if(this.chartInst){this.chartInst.destroy();this.chartInst=null;}return;}
     let labels,vals;
     if(this.chartMode==='count'){
-      let c=0;vals=sorted.map(s=>{c+=s.profit;return Math.round(c*100)/100;});labels=sorted.map((_,i)=>i+1);
+      let c=0;vals=sorted.map(s=>{c+=(s.profit||0);return Math.round(c*100)/100;});labels=sorted.map((_,i)=>i+1);
     } else if(this.chartMode==='date'){
-      const bd={};for(const s of sorted)bd[s.date]=(bd[s.date]||0)+s.profit;
+      const bd={};for(const s of sorted)bd[s.date]=(bd[s.date]||0)+(s.profit||0);
       const dates=Object.keys(bd).sort();let c=0;
       vals=dates.map(d=>{c+=bd[d];return Math.round(c*100)/100;});
       labels=dates.map(d=>{const[,m,day]=d.split('-');return`${+day}.${+m}`;});
     } else {
       const bw={};
-      for(const s of sorted){const d=new Date(s.date+'T12:00:00');const day=d.getDay()||7;const thu=new Date(d);thu.setDate(d.getDate()-(day-4));const yr=thu.getFullYear();const jan4=new Date(yr,0,4);const wn=Math.ceil(((thu-jan4)/86400000+(jan4.getDay()||7)+1)/7);const k=`${yr}-${String(wn).padStart(2,'0')}`;bw[k]=(bw[k]||0)+s.profit;}
+      for(const s of sorted){const d=new Date(s.date+'T12:00:00');const day=d.getDay()||7;const thu=new Date(d);thu.setDate(d.getDate()-(day-4));const yr=thu.getFullYear();const jan4=new Date(yr,0,4);const wn=Math.ceil(((thu-jan4)/86400000+(jan4.getDay()||7)+1)/7);const k=`${yr}-${String(wn).padStart(2,'0')}`;bw[k]=(bw[k]||0)+(s.profit||0);}
       const wks=Object.keys(bw).sort();let c=0;
       vals=wks.map(w=>{c+=bw[w];return Math.round(c*100)/100;});labels=wks.map(w=>w.slice(5));
     }
-    if(this.chartInst)this.chartInst.destroy();
-    const ctx=canvas.getContext('2d');
-    const grad=ctx.createLinearGradient(0,0,0,250);grad.addColorStop(0,'rgba(0,200,150,0.25)');grad.addColorStop(1,'rgba(0,200,150,0)');
-    this.chartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
-      {data:vals,borderColor:'#00c896',backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<50?2:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
-      {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.5)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
-    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'+':'')+this.fmt(c.raw)):''}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+    try{
+      if(this.chartInst)this.chartInst.destroy();
+      const ctx=canvas.getContext('2d');
+      const grad=ctx.createLinearGradient(0,0,0,250);grad.addColorStop(0,'rgba(0,200,150,0.25)');grad.addColorStop(1,'rgba(0,200,150,0)');
+      this.chartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
+        {data:vals,borderColor:'#00c896',backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<50?2:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
+        {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.5)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
+      ]},options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'+':'')+this.fmt(c.raw)):''}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+    }catch(e){this.chartInst=null;}
   },
   renderRollingChart(){
     const canvas=document.getElementById('rollingChart');if(!canvas)return;
-    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderRollingChart(),200);return;}
-    const sorted=[...this.statSessions].sort((a,b)=>a.date.localeCompare(b.date));
+    if(!canvas.offsetWidth||!canvas.offsetHeight){if(this.page==='analytics')setTimeout(()=>this.renderRollingChart(),200);return;}
+    const sorted=[...this.statSessions].filter(s=>s&&s.date).sort((a,b)=>a.date.localeCompare(b.date));
     if(!sorted.length){if(this.rollingChartInst){this.rollingChartInst.destroy();this.rollingChartInst=null;}return;}
     const w=this.rollingWindow;
-    const vals=sorted.map((_,i)=>{const sl=sorted.slice(Math.max(0,i-w+1),i+1);const inv=sl.reduce((a,s)=>a+s.buyIn,0);const p=sl.reduce((a,s)=>a+s.profit,0);return inv?Math.round(p/inv*1000)/10:0;});
+    const vals=sorted.map((_,i)=>{const sl=sorted.slice(Math.max(0,i-w+1),i+1);const inv=sl.reduce((a,s)=>a+(s.buyIn||0),0);const p=sl.reduce((a,s)=>a+(s.profit||0),0);return inv?Math.round(p/inv*1000)/10:0;});
     const labels=sorted.map((_,i)=>i+1);
-    if(this.rollingChartInst)this.rollingChartInst.destroy();
-    const ctx=canvas.getContext('2d');
-    this.rollingChartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
-      {data:vals,borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,0.08)',fill:true,tension:0.4,pointRadius:0,borderWidth:2},
-      {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
-    ]},options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',callbacks:{label:c=>c.datasetIndex===0?`ROI: ${c.raw>=0?'+':''}${c.raw}%`:''}}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>`${v>=0?'+':''}${v}%`}}}}});
+    try{
+      if(this.rollingChartInst)this.rollingChartInst.destroy();
+      const ctx=canvas.getContext('2d');
+      this.rollingChartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
+        {data:vals,borderColor:'#818cf8',backgroundColor:'rgba(129,140,248,0.08)',fill:true,tension:0.4,pointRadius:0,borderWidth:2},
+        {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
+      ]},options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',callbacks:{label:c=>c.datasetIndex===0?`ROI: ${c.raw>=0?'+':''}${c.raw}%`:''}}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>`${v>=0?'+':''}${v}%`}}}}});
+    }catch(e){this.rollingChartInst=null;}
   },
   renderLeagueChart(id){
     const canvas=document.getElementById('leagueChart');if(!canvas)return;
-    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderLeagueChart(id),200);return;}
-    const ss=[...this.leagueSessionsFor(id)].reverse();
+    if(!canvas.offsetWidth||!canvas.offsetHeight){if(this.page==='leagues')setTimeout(()=>this.renderLeagueChart(id),200);return;}
+    const ss=[...this.leagueSessionsFor(id)].filter(s=>s&&s.date).reverse();
     if(ss.length<2){if(this.leagueChartInst){this.leagueChartInst.destroy();this.leagueChartInst=null;}return;}
-    let c=0;const vals=ss.map(s=>{c+=s.profit;return Math.round(c*100)/100;});
+    let c=0;const vals=ss.map(s=>{c+=(s.profit||0);return Math.round(c*100)/100;});
     const lg=LEAGUES.find(l=>l.id===id);const color=lg?.color||'#00c896';
-    if(this.leagueChartInst)this.leagueChartInst.destroy();
-    const ctx=canvas.getContext('2d');const grad=ctx.createLinearGradient(0,0,0,180);
-    grad.addColorStop(0,color+'33');grad.addColorStop(1,color+'00');
-    this.leagueChartInst=new Chart(canvas,{type:'line',data:{labels:vals.map((_,i)=>i+1),datasets:[
-      {data:vals,borderColor:color,backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<20?3:0,borderWidth:2},
-      {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+    try{
+      if(this.leagueChartInst)this.leagueChartInst.destroy();
+      const ctx=canvas.getContext('2d');const grad=ctx.createLinearGradient(0,0,0,180);
+      grad.addColorStop(0,color+'33');grad.addColorStop(1,color+'00');
+      this.leagueChartInst=new Chart(canvas,{type:'line',data:{labels:vals.map((_,i)=>i+1),datasets:[
+        {data:vals,borderColor:color,backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<20?3:0,borderWidth:2},
+        {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
+      ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+    }catch(e){this.leagueChartInst=null;}
   },
 
   // ── Helpers ──
