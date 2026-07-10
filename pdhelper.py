@@ -535,26 +535,21 @@ def notify(title, msg):
         try: _icon.notify(msg, title)
         except Exception: pass
 
+SITE_URL = "https://pdstats.pages.dev/"
+
 def run_tray():
     global _icon
-    local_url = f"http://127.0.0.1:{LOCAL_PORT}/"
     mode_line = f"Репо: {GITHUB_REPO}" if GITHUB_ENABLED else "Режим: только локальный (127.0.0.1)"
     menu = pystray.Menu(
         pystray.MenuItem(f"PokerDom: Ctrl+A, Ctrl+C → {HOTKEY.upper()}", None, enabled=False),
         pystray.MenuItem(mode_line, None, enabled=False),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Открыть PDStats в браузере", lambda i, _: webbrowser.open(local_url)),
+        pystray.MenuItem("Открыть PDStats в браузере", lambda i, _: webbrowser.open(SITE_URL)),
         pystray.MenuItem("Захватить сейчас", lambda i, _: on_hotkey()),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Выход", lambda i, _: i.stop()),
     )
     _icon = pystray.Icon("PDStats Helper", make_icon(), "PDStats Helper", menu)
-
-    def _startup_notify():
-        time.sleep(1.0)
-        notify("PDStats Helper",
-               f"Открывай PDStats по адресу:\n{local_url}")
-    threading.Thread(target=_startup_notify, daemon=True).start()
 
     _icon.run()
 
