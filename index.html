@@ -1169,9 +1169,8 @@ function app() { return {
   _GH_REPO:'ferzillaevarsen-source/PDStats',
   _GH_FILE:'pdimport.json',
   _localTimer:null, _lastLocalTs:'', _localPort:12345,
-  // Координация каналов и бэкофф
-  _localAlive:false, _localSkip:0,   // локальный helper — основной канал
-  _ghSkip:0, _ghRemaining:null,      // GitHub — фолбэк, с бэкоффом по ошибкам/лимитам
+  _localAlive:false, _localSkip:0,
+  _ghSkip:0, _ghRemaining:null, _ghEtag:'',
   // Синхронизация сессий с GitHub
   _sessionsSha:'', _ghSaveTimer:null,
   _timeout(ms){return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));},
@@ -1198,7 +1197,7 @@ function app() { return {
       }
     }).catch(()=>{});
     this._localTimer=setInterval(()=>this._tickLocal(),700);
-    this._pollTimer=setInterval(()=>this._tickGh(),2000);
+    this._pollTimer=setInterval(()=>this._tickGh(),1000);
     this._tickLocal();
     this._tickGh();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){this._localSkip=0;this._ghSkip=0;this._tickLocal();this._tickGh();}});
@@ -1286,26 +1285,28 @@ function app() { return {
     if(!this._ghToken){if(!this._localAlive)this.autoImportStatus='notoken';return;}
     if(this._ghSkip>0){this._ghSkip--;return;}
     const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/'+this._GH_FILE;
+    const hdrs={Authorization:'token '+this._ghToken,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    // ETag: 304 Not Modified не расходует лимит API → можно опрашивать часто
+    if(this._ghEtag)hdrs['If-None-Match']=this._ghEtag;
     try{
       const r=await Promise.race([
-        fetch(url,{headers:{Authorization:'token '+this._ghToken,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}}),
+        fetch(url,{headers:hdrs}),
         this._timeout(4000)
       ]);
+      const etag=r.headers.get('ETag');if(etag)this._ghEtag=etag;
       const rem=r.headers.get('x-ratelimit-remaining');
       if(rem!==null)this._ghRemaining=+rem;
-      if(r.status===401){this.autoImportStatus='badtoken';this._ghSkip=15;return;}
+      if(r.status===304){this.autoImportStatus='ready';return;} // не изменилось — бесплатно
+      if(r.status===401){this.autoImportStatus='badtoken';this._ghSkip=5;return;}
       if(r.status===403){
-        // 403 = либо исчерпан лимит, либо нет доступа к репозиторию
-        if(rem==='0'){this.autoImportStatus='ratelimited';this._ghSkip=30;} // ~60с паузы
-        else{this.autoImportStatus='badtoken';this._ghSkip=15;}
+        if(rem==='0'){this.autoImportStatus='ratelimited';this._ghSkip=10;}
+        else{this.autoImportStatus='badtoken';this._ghSkip=5;}
         return;
       }
       if(r.status===404){this.autoImportStatus='empty';return;}
-      if(!r.ok){this.autoImportStatus='error';this._ghSkip=5;return;}
+      if(!r.ok){this.autoImportStatus='error';this._ghSkip=3;return;}
       const meta=await r.json();
       this.autoImportStatus='ready';
-      // Бережём остаток лимита: при малом остатке реже опрашиваем
-      if(this._ghRemaining!==null&&this._ghRemaining<50)this._ghSkip=15;
       if(meta.sha&&meta.sha!==this._lastSha){
         this._lastSha=meta.sha;
         localStorage.setItem('pdstats_last_sha',meta.sha);
@@ -1320,7 +1321,7 @@ function app() { return {
         }catch(e){this.autoImportStatus='error';}
       }
     }catch(e){
-      this.autoImportStatus='offline';this._ghSkip=5;
+      this.autoImportStatus='offline';this._ghSkip=3;
     }
   },
     exportCSV(){

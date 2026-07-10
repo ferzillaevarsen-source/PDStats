@@ -443,7 +443,7 @@ def capture():
 
         # Выводим PokerDom на передний план
         force_to_foreground(hwnd)
-        time.sleep(0.5)
+        time.sleep(0.3)
 
         # Ищем Chrome_RenderWidgetHostHWND — реальный рендерер Electron
         widgets = find_chrome_widget(hwnd)
@@ -454,7 +454,7 @@ def capture():
             try:
                 win32gui.SetFocus(render)
                 log.debug(f"SetFocus → {render}: OK")
-                time.sleep(0.2)
+                time.sleep(0.1)
             except Exception as e:
                 log.warning(f"SetFocus render: {e}")
 
@@ -470,10 +470,10 @@ def capture():
         # Ctrl+A → Ctrl+C через keybd_event (минует хук keyboard-библиотеки)
         log.debug("Отправляю Ctrl+A...")
         send_ctrl(VK_A)
-        time.sleep(0.4)
+        time.sleep(0.3)
         log.debug("Отправляю Ctrl+C...")
         send_ctrl(VK_C)
-        time.sleep(0.7)
+        time.sleep(0.5)
 
         text = read_clipboard()
         log.info(f"Буфер: длина={len(text)}, первые 300 симв.: {text[:300]!r}")
