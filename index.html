@@ -917,17 +917,20 @@ function app() { return {
   init() {
     this.loadData();
     setTimeout(()=>this.startPolling(), 1000);
-    this.$watch('sessions',()=>this.saveData());
+    this.$watch('sessions',()=>{
+      this.saveData();
+      if(this.page==='stats') this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
+    });
     this.$watch('page',p=>{this.$nextTick(()=>{
-      if(p==='stats') this.renderChart();
-      if(p==='analytics') this.renderRollingChart();
+      if(p==='stats') requestAnimationFrame(()=>this.renderChart());
+      if(p==='analytics') requestAnimationFrame(()=>this.renderRollingChart());
     });});
     this.$watch('statsTab',()=>this.$nextTick(()=>{
       if(this.page==='stats') this.renderChart();
       if(this.page==='analytics') this.renderRollingChart();
     }));
     this.$watch('searchQuery',()=>this.$nextTick(()=>{if(this.page==='stats') this.renderChart();}));
-    this.$nextTick(()=>{if(this.sessions.length>0) this.renderChart();});
+    this.$nextTick(()=>requestAnimationFrame(()=>{if(this.sessions.length>0) this.renderChart();}));
   },
 
   setPreset(p) {
@@ -1111,7 +1114,7 @@ function app() { return {
     const dayTotals=days.map((_,di)=>rows.reduce((a,r)=>a+(r.cells[di].active?r.cells[di].count:0),0));
     return{days,rows,dayTotals,schedule};
   },
-  selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),60);},
+  selectLeague(id){this.selectedLeague=id;this.$nextTick(()=>requestAnimationFrame(()=>this.renderLeagueChart(id)));},
 
 
   // ── Sessions ──
