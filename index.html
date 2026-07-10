@@ -162,7 +162,10 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
           <button class="preset-btn" :class="chartMode==='week'&&'active'" @click="chartMode='week';renderChart()">По неделям</button>
         </div>
       </div>
-      <div style="height:250px"><canvas id="mainChart"></canvas></div>
+      <div style="height:250px;position:relative">
+        <canvas id="mainChart"></canvas>
+        <div x-show="statSessions.length===0" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#374151;font-size:13px">Нет данных — импортируйте историю</div>
+      </div>
     </div>
     <!-- Stakes table -->
     <div class="card overflow-x-auto">

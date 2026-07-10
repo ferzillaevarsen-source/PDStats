@@ -132,6 +132,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Vary", "Origin")
         elif self.headers.get("Origin"):
             log.debug(f"CORS: origin отклонён — {self.headers.get('Origin')!r}")
+        # Обязателен для Chrome Private Network Access (file:// → http://127.0.0.1)
+        self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def do_GET(self):
         body = json.dumps(get_local_data()).encode("utf-8")
