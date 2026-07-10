@@ -951,22 +951,22 @@ function app() { return {
     this.$watch('sessions',()=>{
       this.saveData();
       this._scheduleGhSave();
-      this.$nextTick(()=>requestAnimationFrame(()=>{
+      // тройной rAF: x-show="sessions.length>0" только что открылся — нужно 3 кадра на layout
+      this.$nextTick(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(this.page==='stats') this.renderChart();
         if(this.page==='analytics') this.renderRollingChart();
-      }));
+      }))));
     });
-    // Двойной rAF — x-show нужно два фрейма чтобы canvas получил размер
-    this.$watch('page',p=>{this.$nextTick(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    this.$watch('page',p=>setTimeout(()=>{
       if(p==='stats') this.renderChart();
       if(p==='analytics') this.renderRollingChart();
-    })));});
+    },250));
     this.$watch('statsTab',()=>this.$nextTick(()=>{
       if(this.page==='stats') this.renderChart();
       if(this.page==='analytics') this.renderRollingChart();
     }));
     this.$watch('searchQuery',()=>this.$nextTick(()=>{if(this.page==='stats') this.renderChart();}));
-    this.$nextTick(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{if(this.sessions.length>0) this.renderChart();})));
+    setTimeout(()=>{if(this.sessions.length>0) this.renderChart();},500);
   },
 
   setPreset(p) {
@@ -1150,7 +1150,7 @@ function app() { return {
     const dayTotals=days.map((_,di)=>rows.reduce((a,r)=>a+(r.cells[di].active?r.cells[di].count:0),0));
     return{days,rows,dayTotals,schedule};
   },
-  selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),60);},
+  selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),150);},
   leagueWeekHistory(id){
     const lg=LEAGUES.find(l=>l.id===id);if(!lg)return[];
     const{from:curFrom}=this.weekBounds();
@@ -1544,6 +1544,7 @@ function app() { return {
   // ── Charts ──
   renderChart(){
     const canvas=document.getElementById('mainChart');if(!canvas)return;
+    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderChart(),200);return;}
     const sorted=[...this.statSessions].sort((a,b)=>a.date.localeCompare(b.date));
     if(!sorted.length){if(this.chartInst){this.chartInst.destroy();this.chartInst=null;}return;}
     let labels,vals;
@@ -1572,6 +1573,7 @@ function app() { return {
   },
   renderRollingChart(){
     const canvas=document.getElementById('rollingChart');if(!canvas)return;
+    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderRollingChart(),200);return;}
     const sorted=[...this.statSessions].sort((a,b)=>a.date.localeCompare(b.date));
     if(!sorted.length){if(this.rollingChartInst){this.rollingChartInst.destroy();this.rollingChartInst=null;}return;}
     const w=this.rollingWindow;
@@ -1588,6 +1590,7 @@ function app() { return {
   },
   renderLeagueChart(id){
     const canvas=document.getElementById('leagueChart');if(!canvas)return;
+    if(!canvas.offsetWidth||!canvas.offsetHeight){setTimeout(()=>this.renderLeagueChart(id),200);return;}
     const ss=[...this.leagueSessionsFor(id)].reverse();
     if(ss.length<2){if(this.leagueChartInst){this.leagueChartInst.destroy();this.leagueChartInst=null;}return;}
     let c=0;const vals=ss.map(s=>{c+=s.profit;return Math.round(c*100)/100;});
