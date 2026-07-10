@@ -151,7 +151,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        # /data или любой другой путь → JSON с данными
+        if path == '/config':
+            # Браузер подхватывает GitHub-токен автоматически
+            cfg_out = {
+                "github_token": GITHUB_TOKEN,
+                "github_repo":  GITHUB_REPO,
+                "github_file":  GITHUB_FILE,
+                "github_branch": GITHUB_BRANCH,
+            }
+            body = json.dumps(cfg_out).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        # /data или любой другой путь → JSON с данными захвата
         body = json.dumps(get_local_data()).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")

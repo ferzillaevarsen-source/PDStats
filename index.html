@@ -1173,17 +1173,23 @@ function app() { return {
 
   startPolling(){
     if(this._pollTimer)return;
-    // Режим хранения токена: localStorage (запомнить) или sessionStorage (только сессия)
     const rem=localStorage.getItem('pdstats_gh_remember');
     this._ghRemember=rem===null?true:rem==='1';
     this._ghToken=(this._ghRemember?localStorage.getItem('pdstats_gh_token'):sessionStorage.getItem('pdstats_gh_token'))||'';
     this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
-    // Локальный helper (127.0.0.1) — основной канал; GitHub — фолбэк
+    // Авто-подхват GitHub-токена от локального хелпера (работает при открытии с http://127.0.0.1)
+    fetch('/config').then(r=>r.ok?r.json():null).then(cfg=>{
+      if(cfg&&cfg.github_token&&cfg.github_token!==this._ghToken){
+        this._ghToken=cfg.github_token;
+        localStorage.setItem('pdstats_gh_token',cfg.github_token);
+        this._ghSkip=0;
+        this._tickGh();
+      }
+    }).catch(()=>{});
     this._localTimer=setInterval(()=>this._tickLocal(),700);
     this._pollTimer=setInterval(()=>this._tickGh(),2000);
     this._tickLocal();
     this._tickGh();
-    // Пауза, когда вкладка скрыта; мгновенный опрос при возврате
     document.addEventListener('visibilitychange',()=>{if(!document.hidden){this._localSkip=0;this._ghSkip=0;this._tickLocal();this._tickGh();}});
   },
   stopPolling(){
@@ -1267,8 +1273,6 @@ function app() { return {
   async _tickGh(){
     if(document.hidden)return;
     if(!this._ghToken){if(!this._localAlive)this.autoImportStatus='notoken';return;}
-    // Локальный канал — приоритетный: пока helper жив, GitHub не трогаем (экономим лимит API)
-    if(this._localAlive)return;
     if(this._ghSkip>0){this._ghSkip--;return;}
     const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/'+this._GH_FILE;
     try{
