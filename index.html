@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PDStats</title>
+<!-- pdtoken.js генерируется pdhelper.py при запуске — токен GitHub без ввода руками -->
+<script src="pdtoken.js" onerror="void 0"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1177,7 +1179,11 @@ function app() { return {
     this._ghRemember=rem===null?true:rem==='1';
     this._ghToken=(this._ghRemember?localStorage.getItem('pdstats_gh_token'):sessionStorage.getItem('pdstats_gh_token'))||'';
     this._lastSha=localStorage.getItem('pdstats_last_sha')||'';
-    // Авто-подхват GitHub-токена от локального хелпера (работает при открытии с http://127.0.0.1)
+    // Авто-подхват токена: сначала из pdtoken.js (file://), потом из /config (http://127.0.0.1)
+    if(window.PD_GH_TOKEN&&window.PD_GH_TOKEN!==this._ghToken){
+      this._ghToken=window.PD_GH_TOKEN;
+      localStorage.setItem('pdstats_gh_token',window.PD_GH_TOKEN);
+    }
     fetch('/config').then(r=>r.ok?r.json():null).then(cfg=>{
       if(cfg&&cfg.github_token&&cfg.github_token!==this._ghToken){
         this._ghToken=cfg.github_token;

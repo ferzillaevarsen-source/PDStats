@@ -1,2 +1,6 @@
 pdhelper_config.json
+pdtoken.js
 pdimport.json
+pdhelper.log
+__pycache__/
+*.pyc

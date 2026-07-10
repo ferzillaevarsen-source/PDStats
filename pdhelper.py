@@ -558,10 +558,27 @@ def run_tray():
 
     _icon.run()
 
+def _write_token_js():
+    """Генерирует pdtoken.js рядом с index.html для авто-подхвата токена в браузере."""
+    if not GITHUB_ENABLED:
+        return
+    token_js = _pathlib.Path(__file__).parent / "pdtoken.js"
+    try:
+        token_js.write_text(
+            f'window.PD_GH_TOKEN="{GITHUB_TOKEN}";'
+            f'window.PD_GH_REPO="{GITHUB_REPO}";'
+            f'window.PD_GH_FILE="{GITHUB_FILE}";',
+            encoding="utf-8"
+        )
+        log.info(f"pdtoken.js записан: {token_js}")
+    except Exception as e:
+        log.warning(f"Не удалось записать pdtoken.js: {e}")
+
 # ── Запуск ────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     log.info(f"Хоткей: {HOTKEY!r}, GitHub: {'вкл' if GITHUB_ENABLED else 'выкл'}, файл: {GITHUB_FILE}")
     log.info(f"Лог: {_log_path}")
+    _write_token_js()
     threading.Thread(target=_start_local_server, daemon=True).start()
     if GITHUB_ENABLED:
         gh_get_sha()
