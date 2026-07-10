@@ -177,7 +177,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
         <thead class="tbl-head"><tr>
           <th>Взносы</th><th>Тур.</th><th>Взносы ₽</th><th>Rebuys ₽</th>
           <th>Итого</th><th>Призы</th><th>Топ 9%</th><th>Топ 3%</th>
-          <th>1 место%</th><th>Результат</th><th>ROI%</th><th>ITM%</th>
+          <th>1 место%</th><th>ROI%</th><th>ITM%</th><th>Результат</th>
         </tr></thead>
         <tbody>
           <template x-for="r in stakeRanges" :key="r.label">
@@ -188,9 +188,9 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
               <td x-text="fmt(r.totalInvested)"></td><td x-text="r.totalPrize>0?fmt(r.totalPrize):'0'"></td>
               <td x-text="r.top9.toFixed(1)"></td><td x-text="r.top3.toFixed(1)"></td>
               <td x-text="r.first.toFixed(1)"></td>
-              <td :class="r.profit>=0?'pos font-bold':'neg font-bold'" x-text="(r.profit>=0?'+':'')+fmt(r.profit)"></td>
               <td :class="r.roi>=0?'pos':'neg'" x-text="(r.roi>=0?'+':'')+r.roi.toFixed(1)"></td>
               <td x-text="r.itm.toFixed(1)"></td>
+              <td :class="r.profit>=0?'pos font-bold':'neg font-bold'" x-text="(r.profit>=0?'+':'')+fmt(r.profit)"></td>
             </tr>
           </template>
           <tr class="tbl-row" style="border-top:2px solid rgba(255,255,255,0.09)">
@@ -203,9 +203,9 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
             <td x-text="statSessions.length?(statSessions.filter(s=>s.place>0&&s.place<=9).length/statSessions.length*100).toFixed(1):'0'"></td>
             <td x-text="statSessions.length?(statSessions.filter(s=>s.place>0&&s.place<=3).length/statSessions.length*100).toFixed(1):'0'"></td>
             <td x-text="statSessions.length?(statSessions.filter(s=>s.place===1).length/statSessions.length*100).toFixed(1):'0'"></td>
-            <td :class="totalProfit>=0?'pos font-bold':'neg font-bold'" x-text="(totalProfit>=0?'+':'')+fmt(totalProfit)"></td>
             <td :class="roi>=0?'pos':'neg'" x-text="(roi>=0?'+':'')+roi.toFixed(1)"></td>
             <td x-text="itmPct.toFixed(1)"></td>
+            <td :class="totalProfit>=0?'pos font-bold':'neg font-bold'" x-text="(totalProfit>=0?'+':'')+fmt(totalProfit)"></td>
           </tr>
         </tbody>
       </table>
@@ -935,6 +935,11 @@ function app() { return {
       if(p==='stats') this.renderChart();
       if(p==='analytics') this.renderRollingChart();
     });});
+    this.$watch('statsTab',()=>this.$nextTick(()=>{
+      if(this.page==='stats') this.renderChart();
+      if(this.page==='analytics') this.renderRollingChart();
+    }));
+    this.$watch('searchQuery',()=>this.$nextTick(()=>{if(this.page==='stats') this.renderChart();}));
     this.$nextTick(()=>{if(this.sessions.length>0) this.renderChart();});
   },
 
