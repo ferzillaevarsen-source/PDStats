@@ -924,6 +924,7 @@ function app() { return {
     setTimeout(()=>this.startPolling(), 1000);
     this.$watch('sessions',()=>{
       this.saveData();
+      this._scheduleGhSave();
       if(this.page==='stats') this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
     });
     this.$watch('page',p=>{this.$nextTick(()=>{
@@ -1171,6 +1172,8 @@ function app() { return {
   // Координация каналов и бэкофф
   _localAlive:false, _localSkip:0,   // локальный helper — основной канал
   _ghSkip:0, _ghRemaining:null,      // GitHub — фолбэк, с бэкоффом по ошибкам/лимитам
+  // Синхронизация сессий с GitHub
+  _sessionsSha:'', _ghSaveTimer:null,
   _timeout(ms){return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));},
 
   startPolling(){
@@ -1184,12 +1187,14 @@ function app() { return {
       this._ghToken=window.PD_GH_TOKEN;
       localStorage.setItem('pdstats_gh_token',window.PD_GH_TOKEN);
     }
+    if(this._ghToken)this._ghSyncSessions();
     fetch('/config').then(r=>r.ok?r.json():null).then(cfg=>{
       if(cfg&&cfg.github_token&&cfg.github_token!==this._ghToken){
         this._ghToken=cfg.github_token;
         localStorage.setItem('pdstats_gh_token',cfg.github_token);
         this._ghSkip=0;
         this._tickGh();
+        this._ghSyncSessions();
       }
     }).catch(()=>{});
     this._localTimer=setInterval(()=>this._tickLocal(),700);
@@ -1550,6 +1555,70 @@ function app() { return {
   fmtK(v){if(v==null)return'0';const a=Math.abs(v),sg=v<0?'-':'';if(a>=1000000)return sg+(a/1000000).toFixed(1)+'М';if(a>=1000)return sg+(a/1000).toFixed(0)+'К';return sg+a.toFixed(0);},
   fmtDate(d){if(!d)return'';const[y,m,day]=d.split('-');const mo=['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];return`${+day} ${mo[+m-1]} ${y}`;},
   typeBadge(t){if(t==='MTT')return'badge-mtt';if(t==='SNG')return'badge-sng';if(t==='Cash')return'badge-cash';if(t==='Windfall')return'badge-wf';return'badge-mtt';},
+  // ── GitHub sessions sync ──
+  _ghH(){return{Authorization:'token '+this._ghToken,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'};},
+
+  _scheduleGhSave(){
+    if(this._ghSaveTimer)clearTimeout(this._ghSaveTimer);
+    this._ghSaveTimer=setTimeout(()=>this._ghSaveSessions(),3000);
+  },
+
+  async _ghSaveSessions(){
+    if(!this._ghToken||!this.sessions.length)return;
+    const payload=JSON.stringify({ts:new Date().toISOString(),sessions:this.sessions});
+    const enc=new TextEncoder().encode(payload);
+    let bin='';enc.forEach(b=>bin+=String.fromCharCode(b));
+    const content=btoa(bin);
+    const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/pdsessions.json';
+    const mkBody=sha=>JSON.stringify({message:'pdstats sessions',content,branch:'main',...(sha?{sha}:{})});
+    try{
+      let r=await fetch(url,{method:'PUT',headers:this._ghH(),body:mkBody(this._sessionsSha)});
+      if(r.status===409){
+        const m=await(await fetch(url,{headers:this._ghH()})).json();
+        this._sessionsSha=m.sha;
+        r=await fetch(url,{method:'PUT',headers:this._ghH(),body:mkBody(m.sha)});
+      }
+      if(r.ok){
+        this._sessionsSha=(await r.json()).content.sha;
+        localStorage.setItem('pdstats_sessions_sha',this._sessionsSha);
+      }
+    }catch(e){}
+  },
+
+  async _ghSyncSessions(){
+    if(!this._ghToken)return;
+    this._sessionsSha=localStorage.getItem('pdstats_sessions_sha')||'';
+    const url='https://api.github.com/repos/'+this._GH_REPO+'/contents/pdsessions.json';
+    try{
+      const r=await fetch(url,{headers:this._ghH()});
+      if(!r.ok)return;
+      const meta=await r.json();
+      if(meta.sha===this._sessionsSha&&this.sessions.length)return;
+      this._sessionsSha=meta.sha;
+      localStorage.setItem('pdstats_sessions_sha',meta.sha);
+      const raw=atob(meta.content.replace(/\n/g,''));
+      const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
+      const d=JSON.parse(new TextDecoder('utf-8').decode(bytes));
+      if(!d.sessions?.length)return;
+      if(!this.sessions.length){
+        this.sessions=d.sessions;
+        this.saveData();
+        this.showToast('☁️ Загружено из GitHub: '+d.sessions.length+' турниров');
+        this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
+        return;
+      }
+      let added=0;
+      for(const s of d.sessions){
+        if(!this.sessions.some(e=>e.id===s.id)){this.sessions.push(s);added++;}
+      }
+      if(added){
+        this.saveData();
+        this.showToast('☁️ Синхронизировано из GitHub: +'+added+' турниров');
+        this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
+      }
+    }catch(e){}
+  },
+
   saveData(){localStorage.setItem('pdstats2_sessions',JSON.stringify(this.sessions));},
   loadData(){const s=localStorage.getItem('pdstats2_sessions');if(s)try{this.sessions=JSON.parse(s);}catch{}},
 };}
