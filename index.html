@@ -155,8 +155,8 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       <button @click="searchQuery='';dateFrom='';dateTo='';preset='all';activeFrom='';activeTo='';$nextTick(()=>renderChart())" class="btn-ghost">Сброс</button>
     </div>
     <!-- Chart -->
-    <div class="card p-5 mb-4">
-      <div class="flex items-center justify-between mb-3">
+    <div class="card mb-4" style="padding:16px 16px 12px">
+      <div class="flex items-center justify-between mb-2">
         <span style="font-size:13px;font-weight:600;color:#9ca3af">Кривая профита</span>
         <div class="flex gap-1">
           <button class="preset-btn" :class="chartMode==='count'&&'active'" @click="chartMode='count';renderChart()">По турнирам</button>
@@ -164,7 +164,13 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
           <button class="preset-btn" :class="chartMode==='week'&&'active'" @click="chartMode='week';renderChart()">По неделям</button>
         </div>
       </div>
-      <div style="height:250px;position:relative">
+      <div style="height:300px;position:relative">
+        <!-- Inline stats overlay -->
+        <div x-show="statSessions.length>0" style="position:absolute;top:8px;left:10px;z-index:5;pointer-events:none;line-height:1.7">
+          <div style="font-size:12px;font-weight:700" :class="roi>=0?'pos':'neg'" x-text="'ROI: '+(roi>=0?'+':'')+roi.toFixed(1)+'%'"></div>
+          <div style="font-size:12px;color:#6b7280" x-text="'Турниров: '+statSessions.length"></div>
+          <div style="font-size:12px;color:#6b7280" x-text="'ITM: '+itmPct.toFixed(1)+'%'"></div>
+        </div>
         <canvas id="mainChart"></canvas>
         <div x-show="statSessions.length===0" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#374151;font-size:13px">Нет данных — импортируйте историю</div>
       </div>
@@ -1053,6 +1059,11 @@ function app() { return {
     }));
     this.$watch('searchQuery',()=>this.$nextTick(()=>{if(this.page==='stats') this.renderChart();}));
     setTimeout(()=>{if(this.sessions.length>0) this.renderChart();},500);
+    // Heartbeat: если график пропал, но данные есть — восстановить
+    setInterval(()=>{
+      if(this.page==='stats'&&this.statSessions.length>0&&!this.chartInst)this.renderChart();
+      if(this.page==='analytics'&&this.statSessions.length>0&&!this.rollingChartInst)this.renderRollingChart();
+    },1500);
   },
 
   setPreset(p) {
@@ -1675,14 +1686,20 @@ function app() { return {
     }
     try{
       if(this.chartInst)this.chartInst.destroy();
+      const lastVal=vals[vals.length-1]||0;
+      const lineColor=lastVal>=0?'#00c896':'#ef4444';
+      const gradStart=lastVal>=0?'rgba(0,200,150,0.22)':'rgba(239,68,68,0.22)';
       const ctx=canvas.getContext('2d');
-      const grad=ctx.createLinearGradient(0,0,0,250);grad.addColorStop(0,'rgba(0,200,150,0.25)');grad.addColorStop(1,'rgba(0,200,150,0)');
+      const grad=ctx.createLinearGradient(0,0,0,300);grad.addColorStop(0,gradStart);grad.addColorStop(1,'rgba(0,0,0,0)');
       this.chartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
-        {data:vals,borderColor:'#00c896',backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<50?2:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
-        {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.5)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
+        {data:vals,borderColor:lineColor,backgroundColor:grad,fill:true,tension:0.3,pointRadius:0,pointHoverRadius:5,borderWidth:2,label:'Профит'},
+        {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
       ]},options:{responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
-        plugins:{legend:{display:false},tooltip:{backgroundColor:'#0f0f1e',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'+':'')+this.fmt(c.raw)):''}}},
-        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',maxTicksLimit:10}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+        plugins:{legend:{display:false},tooltip:{backgroundColor:'#0a0a1a',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,titleColor:'#6b7280',bodyColor:'#e2e8f0',padding:10,callbacks:{label:c=>c.datasetIndex===0?((c.raw>=0?'▲ +':'▼ ')+this.fmt(c.raw)):''}}},
+        scales:{
+          x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#374151',maxTicksLimit:12},border:{color:'rgba(255,255,255,0.06)'}},
+          y:{position:'right',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)},border:{color:'rgba(255,255,255,0.06)'}}
+        }}});
     }catch(e){this.chartInst=null;}
   },
   renderRollingChart(){
