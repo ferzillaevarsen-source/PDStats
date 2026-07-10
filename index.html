@@ -36,6 +36,8 @@ input,select,textarea{background:#13132a;border:1px solid rgba(255,255,255,0.1);
 input:focus,select:focus,textarea:focus{border-color:#00c896}
 input::placeholder,textarea::placeholder{color:#2d3748}
 .pos{color:#00c896}.neg{color:#ff4444}
+@keyframes chart-blink{0%,100%{opacity:1}50%{opacity:0.25}}
+.chart-end-label{position:absolute;right:0;transform:translateY(-50%);padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1.5px solid;pointer-events:none;white-space:nowrap;animation:chart-blink 1.4s ease-in-out infinite;z-index:10;background:#0a0a1a}
 .tbl-head th{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#4b5563;padding:10px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.06);user-select:none}
 .tbl-head th:first-child{text-align:left}
 .tbl-head th.sort{cursor:pointer}.tbl-head th.sort:hover{color:#9ca3af}
@@ -172,6 +174,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
           <div style="font-size:12px;color:#6b7280" x-text="'ITM: '+itmPct.toFixed(1)+'%'"></div>
         </div>
         <canvas id="mainChart"></canvas>
+        <div id="chartEndLabel" class="chart-end-label" style="display:none"></div>
         <div x-show="statSessions.length===0" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#374151;font-size:13px">Нет данных — импортируйте историю</div>
       </div>
     </div>
@@ -561,8 +564,19 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
       </div>
       <!-- League profit chart -->
       <div x-show="leagueSessionsFor(selectedLeague).length>1" class="card p-4 mb-4">
-        <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:10px">Кривая профита в лиге</div>
-        <div style="height:180px"><canvas id="leagueChart"></canvas></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:600;color:#6b7280">Кривая профита в лиге</span>
+          <div class="flex gap-1">
+            <button class="preset-btn" :class="leagueChartMode==='count'&&'active'" @click="setLeagueChartMode('count')">По турнирам</button>
+            <button class="preset-btn" :class="leagueChartMode==='date'&&'active'" @click="setLeagueChartMode('date')">По дням</button>
+            <button class="preset-btn" :class="leagueChartMode==='week'&&'active'" @click="setLeagueChartMode('week')">По неделям</button>
+            <button class="preset-btn" :class="leagueChartMode==='month'&&'active'" @click="setLeagueChartMode('month')">По месяцам</button>
+          </div>
+        </div>
+        <div style="height:200px;position:relative">
+          <canvas id="leagueChart"></canvas>
+          <div id="leagueChartEndLabel" class="chart-end-label" style="display:none"></div>
+        </div>
       </div>
       <!-- This week matrix -->
       <div class="card overflow-x-auto mb-4" x-data="{get mx(){return leagueWeekMatrix(selectedLeague)}}">
@@ -1027,7 +1041,7 @@ const RANGES=[
 
 function app() { return {
   LEAGUES, page:'stats', sessions:[],
-  statsTab:'all', dateFrom:'', dateTo:'', preset:'all', activeFrom:'', activeTo:'', searchQuery:'', chartMode:'count',
+  statsTab:'all', dateFrom:'', dateTo:'', preset:'all', activeFrom:'', activeTo:'', searchQuery:'', chartMode:'count', leagueChartMode:'count',
   calYear:new Date().getFullYear(), calMonth:new Date().getMonth(), calView:'month',
   selectedLeague:null,
   importText:'', importDate:'', importError:'', importSuccess:'', importing:false, autoImportStatus:'idle',
@@ -1289,6 +1303,7 @@ function app() { return {
     return{days,rows,dayTotals,schedule};
   },
   selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),150);},
+  setLeagueChartMode(m){this.leagueChartMode=m;this.$nextTick(()=>this.renderLeagueChart(this.selectedLeague));},
   leagueWeekHistory(id){
     const lg=LEAGUES.find(l=>l.id===id);if(!lg)return[];
     const{from:curFrom}=this.weekBounds();
@@ -1729,6 +1744,15 @@ function app() { return {
           x:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#374151',maxTicksLimit:12},border:{color:'rgba(255,255,255,0.06)'}},
           y:{position:'right',grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)},border:{color:'rgba(255,255,255,0.06)'}}
         }}});
+      // End-point badge
+      const el=document.getElementById('chartEndLabel');
+      if(el&&this.chartInst){
+        const yPx=this.chartInst.scales.y.getPixelForValue(lastVal);
+        el.style.top=yPx+'px';el.style.display='block';
+        el.textContent=(lastVal>=0?'+':'')+this.fmtK(lastVal);
+        el.style.color=lastVal>=0?'#00c896':'#ef4444';
+        el.style.borderColor=lastVal>=0?'#00c896':'#ef4444';
+      }
     }catch(e){this.chartInst=null;}
   },
   renderRollingChart(){
@@ -1759,19 +1783,49 @@ function app() { return {
     const canvas=document.getElementById('leagueChart');if(!canvas)return;
     const w=this._setCanvasSize(canvas,200);
     if(!w){if(this.page==='leagues')setTimeout(()=>this.renderLeagueChart(id),150);return;}
-    const ss=[...this.leagueSessionsFor(id)].filter(s=>s&&s.date).reverse();
-    if(ss.length<2){if(this.leagueChartInst){this.leagueChartInst.destroy();this.leagueChartInst=null;}return;}
-    let c=0;const vals=ss.map(s=>{c+=(s.profit||0);return Math.round(c*100)/100;});
+    const sorted=[...this.leagueSessionsFor(id)].filter(s=>s&&s.date).sort((a,b)=>a.date.localeCompare(b.date));
+    if(sorted.length<2){if(this.leagueChartInst){this.leagueChartInst.destroy();this.leagueChartInst=null;}return;}
+    let labels,vals;
+    const m=this.leagueChartMode;
+    if(m==='count'){
+      let c=0;vals=sorted.map(s=>{c+=(s.profit||0);return Math.round(c*100)/100;});labels=sorted.map((_,i)=>i+1);
+    } else if(m==='date'){
+      const bd={};for(const s of sorted)bd[s.date]=(bd[s.date]||0)+(s.profit||0);
+      const dates=Object.keys(bd).sort();let c=0;
+      vals=dates.map(d=>{c+=bd[d];return Math.round(c*100)/100;});
+      labels=dates.map(d=>{const[,mo,day]=d.split('-');return`${+day}.${+mo}`;});
+    } else if(m==='week'){
+      const bw={};
+      for(const s of sorted){const d=new Date(s.date+'T12:00:00');const day=d.getDay()||7;const thu=new Date(d);thu.setDate(d.getDate()-(day-4));const yr=thu.getFullYear();const jan4=new Date(yr,0,4);const wn=Math.ceil(((thu-jan4)/86400000+(jan4.getDay()||7)+1)/7);const k=`${yr}-${String(wn).padStart(2,'0')}`;bw[k]=(bw[k]||0)+(s.profit||0);}
+      const wks=Object.keys(bw).sort();let c=0;
+      vals=wks.map(wk=>{c+=bw[wk];return Math.round(c*100)/100;});labels=wks.map(wk=>wk.slice(5));
+    } else {
+      const bm={};
+      for(const s of sorted){const k=s.date.slice(0,7);bm[k]=(bm[k]||0)+(s.profit||0);}
+      const months=Object.keys(bm).sort();let c=0;
+      vals=months.map(k=>{c+=bm[k];return Math.round(c*100)/100;});
+      labels=months.map(k=>{const[,mo]=k.split('-');const mn=['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];return mn[+mo-1];});
+    }
+    const lastVal=vals[vals.length-1]||0;
     const lg=LEAGUES.find(l=>l.id===id);const color=lg?.color||'#00c896';
     try{
       if(this.leagueChartInst){this.leagueChartInst.destroy();this.leagueChartInst=null;}
       const ctx=canvas.getContext('2d');const grad=ctx.createLinearGradient(0,0,0,200);
       grad.addColorStop(0,color+'33');grad.addColorStop(1,color+'00');
-      this.leagueChartInst=new Chart(canvas,{type:'line',data:{labels:vals.map((_,i)=>i+1),datasets:[
+      this.leagueChartInst=new Chart(canvas,{type:'line',data:{labels,datasets:[
         {data:vals,borderColor:color,backgroundColor:grad,fill:true,tension:0.3,pointRadius:vals.length<20?3:0,borderWidth:2},
         {data:new Array(vals.length).fill(0),borderColor:'rgba(255,68,68,0.4)',borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false},
       ]},options:{responsive:false,animation:false,plugins:{legend:{display:false}},
-        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+        scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151'}},y:{position:'right',grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#374151',callback:v=>this.fmtK(v)}}}}});
+      // End-point badge
+      const el=document.getElementById('leagueChartEndLabel');
+      if(el&&this.leagueChartInst){
+        const yPx=this.leagueChartInst.scales.y.getPixelForValue(lastVal);
+        el.style.top=yPx+'px';el.style.display='block';
+        el.textContent=(lastVal>=0?'+':'')+this.fmtK(lastVal);
+        el.style.color=lastVal>=0?'#00c896':'#ef4444';
+        el.style.borderColor=lastVal>=0?'#00c896':'#ef4444';
+      }
     }catch(e){this.leagueChartInst=null;}
   },
 
