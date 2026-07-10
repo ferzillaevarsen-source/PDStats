@@ -90,7 +90,7 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
     </div>
     <div class="flex items-center gap-0.5">
       <button class="nav-link" :class="page==='stats'&&'active'" @click="page='stats'"><i class="fas fa-chart-line mr-1"></i>Статистика</button>
-      <button class="nav-link" :class="page==='analytics'&&'active'" @click="page='analytics';$nextTick(()=>renderRollingChart())"><i class="fas fa-flask mr-1"></i>Аналитика</button>
+      <button class="nav-link" :class="page==='analytics'&&'active'" @click="page='analytics'"><i class="fas fa-flask mr-1"></i>Аналитика</button>
       <button class="nav-link" :class="page==='calendar'&&'active'" @click="page='calendar'"><i class="fas fa-calendar-alt mr-1"></i>Календарь</button>
       <button class="nav-link" :class="page==='leagues'&&'active'" @click="page='leagues'"><i class="fas fa-trophy mr-1"></i>Лиги</button>
       <button class="nav-link" :class="page==='import'&&'active'" @click="page='import'"><i class="fas fa-upload mr-1"></i>Импорт</button>
@@ -545,6 +545,32 @@ kbd{background:#1a1a2e;padding:1px 6px;border-radius:4px;font-size:11px;font-fam
           </tbody>
         </table>
       </div>
+      <!-- Week history -->
+      <template x-if="leagueWeekHistory(selectedLeague).length>0">
+        <div class="card overflow-x-auto mb-4">
+          <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.06)">
+            <span style="font-size:13px;font-weight:600;color:#e2e8f0">История по неделям</span>
+          </div>
+          <table class="w-full">
+            <thead class="tbl-head"><tr>
+              <th style="text-align:left">Неделя</th>
+              <th>Игр</th>
+              <th>Турниров</th>
+              <th>Профит</th>
+            </tr></thead>
+            <tbody>
+              <template x-for="w in leagueWeekHistory(selectedLeague)" :key="w.from">
+                <tr class="tbl-row">
+                  <td style="color:#9ca3af;white-space:nowrap" x-text="w.label"></td>
+                  <td x-text="w.count"></td>
+                  <td style="color:#6b7280" x-text="w.played+' / '+w.total"></td>
+                  <td :class="w.profit>=0?'pos font-bold':'neg font-bold'" x-text="(w.profit>=0?'+':'')+fmt(w.profit)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </template>
       <!-- League sessions -->
       <template x-if="leagueSessionsFor(selectedLeague).length>0">
         <div class="card overflow-x-auto">
@@ -925,18 +951,22 @@ function app() { return {
     this.$watch('sessions',()=>{
       this.saveData();
       this._scheduleGhSave();
-      if(this.page==='stats') this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
+      this.$nextTick(()=>requestAnimationFrame(()=>{
+        if(this.page==='stats') this.renderChart();
+        if(this.page==='analytics') this.renderRollingChart();
+      }));
     });
-    this.$watch('page',p=>{this.$nextTick(()=>{
-      if(p==='stats') requestAnimationFrame(()=>this.renderChart());
-      if(p==='analytics') requestAnimationFrame(()=>this.renderRollingChart());
-    });});
+    // Двойной rAF — x-show нужно два фрейма чтобы canvas получил размер
+    this.$watch('page',p=>{this.$nextTick(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(p==='stats') this.renderChart();
+      if(p==='analytics') this.renderRollingChart();
+    })));});
     this.$watch('statsTab',()=>this.$nextTick(()=>{
       if(this.page==='stats') this.renderChart();
       if(this.page==='analytics') this.renderRollingChart();
     }));
     this.$watch('searchQuery',()=>this.$nextTick(()=>{if(this.page==='stats') this.renderChart();}));
-    this.$nextTick(()=>requestAnimationFrame(()=>{if(this.sessions.length>0) this.renderChart();}));
+    this.$nextTick(()=>requestAnimationFrame(()=>requestAnimationFrame(()=>{if(this.sessions.length>0) this.renderChart();})));
   },
 
   setPreset(p) {
@@ -1120,7 +1150,28 @@ function app() { return {
     const dayTotals=days.map((_,di)=>rows.reduce((a,r)=>a+(r.cells[di].active?r.cells[di].count:0),0));
     return{days,rows,dayTotals,schedule};
   },
-  selectLeague(id){this.selectedLeague=id;this.$nextTick(()=>requestAnimationFrame(()=>this.renderLeagueChart(id)));},
+  selectLeague(id){this.selectedLeague=id;setTimeout(()=>this.renderLeagueChart(id),60);},
+  leagueWeekHistory(id){
+    const lg=LEAGUES.find(l=>l.id===id);if(!lg)return[];
+    const{from:curFrom}=this.weekBounds();
+    const ss=this.sessions.filter(s=>s.leagueId===id&&s.date<curFrom);
+    if(!ss.length)return[];
+    const map={};
+    for(const s of ss){
+      const d=new Date(s.date+'T12:00:00'),day=d.getDay()||7,mon=new Date(d);
+      mon.setDate(d.getDate()-(day-1));
+      const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+      const iso=dt=>dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+      const k=iso(mon);
+      if(!map[k])map[k]={from:iso(mon),to:iso(sun),items:[],profit:0};
+      map[k].items.push(s);map[k].profit+=s.profit;
+    }
+    const fd=dt=>{const[,m,d]=dt.split('-');return`${+d}.${+m}`;};
+    return Object.values(map).sort((a,b)=>b.from.localeCompare(a.from)).map(w=>{
+      const played=new Set(w.items.map(s=>{for(const t of lg.tournaments){if(leagueMatchName(t.name,s.tournamentName||''))return t.name;}return s.tournamentName;})).size;
+      return{label:`${fd(w.from)}–${fd(w.to)}`,from:w.from,count:w.items.length,profit:w.profit,played,total:lg.tournaments.length};
+    });
+  },
 
 
   // ── Sessions ──
@@ -1172,7 +1223,7 @@ function app() { return {
   _localAlive:false, _localSkip:0,
   _ghSkip:0, _ghRemaining:null, _ghEtag:'',
   // Синхронизация сессий с GitHub
-  _sessionsSha:'', _ghSaveTimer:null,
+  _sessionsSha:'', _ghSaveTimer:null, _ghSyncing:false,
   _timeout(ms){return new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),ms));},
 
   startPolling(){
@@ -1243,7 +1294,7 @@ function app() { return {
         if(!this.sessions.some(e=>e._key===key)){s._key=key;this.sessions.push(s);added++;}
       }
       this.autoImportStatus='ready';
-      if(added>0){this.showToast('⚡ Авто-импорт: +'+added+' турниров');this.$nextTick(()=>this.renderChart());}
+      if(added>0){this.showToast('⚡ Авто-импорт: +'+added+' турниров');this.$nextTick(()=>requestAnimationFrame(()=>{this.renderChart();if(this.page==='analytics')this.renderRollingChart();}));}
       else{this.showToast('Авто-импорт: все записи уже есть');}
     }catch(e){
       this.autoImportStatus='error';
@@ -1560,6 +1611,7 @@ function app() { return {
   _ghH(){return{Authorization:'token '+this._ghToken,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28','Content-Type':'application/json'};},
 
   _scheduleGhSave(){
+    if(this._ghSyncing)return;
     if(this._ghSaveTimer)clearTimeout(this._ghSaveTimer);
     this._ghSaveTimer=setTimeout(()=>this._ghSaveSessions(),3000);
   },
@@ -1601,21 +1653,24 @@ function app() { return {
       const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0));
       const d=JSON.parse(new TextDecoder('utf-8').decode(bytes));
       if(!d.sessions?.length)return;
+      const rend=()=>this.$nextTick(()=>requestAnimationFrame(()=>{this.renderChart();if(this.page==='analytics')this.renderRollingChart();}));
+      this._ghSyncing=true;
       if(!this.sessions.length){
         this.sessions=d.sessions;
         this.saveData();
+        this._ghSyncing=false;
         this.showToast('☁️ Загружено из GitHub: '+d.sessions.length+' турниров');
-        this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
-        return;
+        rend();return;
       }
       let added=0;
       for(const s of d.sessions){
         if(!this.sessions.some(e=>e.id===s.id)){this.sessions.push(s);added++;}
       }
+      this._ghSyncing=false;
       if(added){
         this.saveData();
         this.showToast('☁️ Синхронизировано из GitHub: +'+added+' турниров');
-        this.$nextTick(()=>requestAnimationFrame(()=>this.renderChart()));
+        rend();
       }
     }catch(e){}
   },
