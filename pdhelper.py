@@ -9,7 +9,7 @@ PDStats Helper — авто-импорт турнирной истории из 
 Локального канала достаточно для одного ПК. GitHub включается, только если в
 pdhelper_config.json задан github_token.
 """
-import sys, time, threading, json, ctypes, base64, logging, traceback
+import sys, time, threading, json, ctypes, base64, logging, traceback, webbrowser
 import http.server
 
 # ── Настройки по умолчанию (переопределяются в pdhelper_config.json) ────────────
@@ -136,6 +136,22 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Private-Network", "true")
 
     def do_GET(self):
+        path = self.path.split('?')[0]
+        if path in ('', '/'):
+            # Раздаём index.html — тогда страница и /data на одном origin'е (нет CORS)
+            html_file = _pathlib.Path(__file__).parent / 'index.html'
+            try:
+                body = html_file.read_bytes()
+            except Exception:
+                body = b'<h1>index.html not found in ' + str(html_file).encode() + b'</h1>'
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        # /data или любой другой путь → JSON с данными
         body = json.dumps(get_local_data()).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -505,16 +521,25 @@ def notify(title, msg):
 
 def run_tray():
     global _icon
+    local_url = f"http://127.0.0.1:{LOCAL_PORT}/"
     mode_line = f"Репо: {GITHUB_REPO}" if GITHUB_ENABLED else "Режим: только локальный (127.0.0.1)"
     menu = pystray.Menu(
         pystray.MenuItem(f"PokerDom: Ctrl+A, Ctrl+C → {HOTKEY.upper()}", None, enabled=False),
         pystray.MenuItem(mode_line, None, enabled=False),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Открыть PDStats в браузере", lambda i, _: webbrowser.open(local_url)),
         pystray.MenuItem("Захватить сейчас", lambda i, _: on_hotkey()),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Выход", lambda i, _: i.stop()),
     )
     _icon = pystray.Icon("PDStats Helper", make_icon(), "PDStats Helper", menu)
+
+    def _startup_notify():
+        time.sleep(1.0)
+        notify("PDStats Helper",
+               f"Открывай PDStats по адресу:\n{local_url}")
+    threading.Thread(target=_startup_notify, daemon=True).start()
+
     _icon.run()
 
 # ── Запуск ────────────────────────────────────────────────────────────────────
